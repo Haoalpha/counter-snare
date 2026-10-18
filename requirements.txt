@@ -1,0 +1,10 @@
+greennode-agentbase==1.0.3
+langgraph==1.2.16
+openai==3.33.0
+scikit-learn==1.9.1
+pandas==3.0.6
+numpy==2.5.4
+python-dotenv==1.2.4
+uvicorn==0.54.0
+pytest==9.1.1
+httpx==0.28.1
