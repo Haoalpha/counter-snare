@@ -75,8 +75,12 @@
                     placeholder="Paste a scam message, chat transcript or transaction-monitoring alert…"></textarea>
           <div class="mt-3 flex flex-wrap items-center gap-2">
             <button id="btn-execute" class="btn btn-primary"><i data-lucide="play" class="h-4 w-4"></i>Execute Analysis</button>
-            <button id="btn-honeypot" class="btn btn-ghost"><i data-lucide="fish" class="h-4 w-4"></i>Deploy Honeypot Decoy Agent</button>
+            <button id="btn-honeypot" class="btn btn-ghost" title="Use when the scam message has no receiving account yet"><i data-lucide="fish" class="h-4 w-4"></i>Deploy Honeypot Decoy Agent</button>
             <span class="ml-auto text-[11px] text-slate-500">100% synthetic data · no real customer data</span>
+          </div>
+          <div class="mt-2 grid gap-1 text-[11.5px] text-slate-500 sm:grid-cols-2">
+            <div><i data-lucide="play" class="mr-1 inline h-3 w-3 text-emerald-400"></i><b class="text-slate-300">Execute Analysis</b> — message already contains the receiving (mule) account.</div>
+            <div><i data-lucide="fish" class="mr-1 inline h-3 w-3 text-amber-400"></i><b class="text-slate-300">Honeypot Decoy</b> — scammer made first contact only; a decoy persona makes them reveal the account (simulation).</div>
           </div>
           <div id="honeypot-panel" class="mt-4 hidden"></div>
         </div>

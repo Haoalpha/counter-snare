@@ -51,7 +51,7 @@ responsive 375–1440px; đồ thị mạng phân loại bằng **màu + hình d
 | **Alert Triage** | Cảnh báo luật truyền thống → quyết định của agent, có giải thích |
 | **Governance & Observability** | Runtime telemetry, MaaS gateway & RPM theo cửa sổ trượt 60s, token usage, audit trail append-only, Policy Group, kiến trúc |
 
-3 preset demo: *Phishing Investment Scam*, *Fast Multi-hop Laundering* (kèm đòn prompt injection), *False Positive – Corporate Payroll* (tự đóng, không sinh STR).
+4 preset demo: *Phishing Investment Scam*, *Fast Multi-hop Laundering* (kèm đòn prompt injection), *False Positive – Corporate Payroll* (tự đóng, không sinh STR), *Opening Contact – No Account Yet* (kẻ gian mới tiếp cận, chưa lộ tài khoản: Execute Analysis gợi ý **Honeypot Decoy Agent**, persona mồi nhử dùng chính tin nhắn trong ô nhập để dụ kẻ gian đọc ra tài khoản mule rồi điều tra cả đường dây).
 
 ## 4. Tuân thủ quy định kỹ thuật của BTC
 
@@ -105,7 +105,7 @@ python -m venv .venv && .venv/Scripts/pip install -r requirements.txt   # Linux/
 python -m scripts.build_assets        # sinh dữ liệu tổng hợp, huấn luyện, đánh giá -> data/
 cp .env.example .env                  # điền LLM_API_KEY (GreenNode MaaS); để trống = chế độ offline
 python main.py                        # http://localhost:8080
-python -m pytest -q                   # 14 bài kiểm thử (end-to-end, false-positive, Shapley, rate limit)
+python -m pytest -q                   # 16 bài kiểm thử (end-to-end, false-positive, honeypot, Shapley, rate limit)
 ```
 
 Gọi agent theo chuẩn AgentBase:

@@ -80,6 +80,25 @@ def test_triage_no_missed_mules():
     assert m["missed_mules"] == 0 and m["auto_closed"] > 0
 
 
+def test_preset4_needs_honeypot_then_reveals_ring():
+    p4 = next(p for p in main.PRESETS if p["id"] == "P4")
+    r = client.post("/api/investigate", json={"text": p4["text"]}).json()
+    assert r["status"] == "NO_SEED"  # chưa có số tài khoản -> Execute không có gì để điều tra
+    h = client.post("/api/honeypot", json={"text": p4["text"], "campaign_id": p4["campaign_id"]}).json()
+    assert h["transcript"][0]["text"] == p4["text"] and not h["opening_had_account"]
+    hidden = next(m for m in main.MESSAGES if m["campaign_id"] == p4["campaign_id"])
+    assert hidden["seed_account"] in h["extracted_accounts"]
+    case = client.post("/api/investigate", json={"text": h["scam_text"]}).json()
+    assert case["ring"]["summary"]["n_mules"] > 0
+
+
+def test_honeypot_uses_typed_opening_and_matching_typology():
+    opening = "Chào bạn, bên mình tuyển CTV làm nhiệm vụ like đơn hàng, hoa hồng 15% mỗi đơn, bạn tham gia không?"
+    h = client.post("/api/honeypot", json={"text": opening}).json()
+    assert h["transcript"][0]["text"] == opening
+    assert h["typology"] == "viec_nhe_luong_cao" and h["extracted_accounts"]
+
+
 def test_honeypot_extracts_account():
     r = client.post("/api/honeypot", json={"campaign_id": main.MESSAGES[0]["campaign_id"]}).json()
     assert main.MESSAGES[0]["seed_account"] in r["extracted_accounts"]

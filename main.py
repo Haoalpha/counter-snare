@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 import pickle
-import random
 import sys
 import threading
 from datetime import datetime
@@ -32,7 +31,7 @@ from starlette.responses import FileResponse, JSONResponse  # noqa: E402
 from starlette.routing import Mount, Route  # noqa: E402
 from starlette.staticfiles import StaticFiles  # noqa: E402
 
-from app.agents import Investigator  # noqa: E402
+from app.agents import TYPO_KEYWORDS, Investigator, _fold  # noqa: E402
 from app.arena import run_arena  # noqa: E402
 from app.audit import audit  # noqa: E402
 from app.bank import Bank  # noqa: E402
@@ -90,6 +89,13 @@ def _build_presets() -> list[dict]:
                                  f"({BANK.acc.loc[emp, 'holder_name']}) thực hiện {len(d)} lệnh chuyển tiền tới {d['dst'].nunique()} "
                                  f"người nhận khác nhau trong ngày {day.strftime('%d/%m/%Y')}, tổng "
                                  + f"{int(d['amount'].sum()):,}".replace(",", ".") + " đ. Đề nghị rà soát dấu hiệu phân tán tiền.")})
+    # P4: kẻ gian mới chỉ tiếp cận, CHƯA lộ tài khoản nhận tiền -> Execute không có gì để điều tra, cần Honeypot Decoy
+    hidden = next((m for m in MESSAGES[1:] if m["typology"] == "gia_danh_cong_an"), MESSAGES[1])
+    presets.append({"id": "P4", "label": "Opening Contact - No Account Yet", "expect": "Use Honeypot Decoy Agent",
+                    "campaign_id": hidden["campaign_id"], "honeypot": True,
+                    "text": ("Alo, bác có phải chủ thuê bao này không ạ? Tôi là cán bộ điều tra Công an quận. Hồ sơ của bác đang liên quan "
+                             "đến một đường dây rửa tiền xuyên quốc gia, bác phải hợp tác xác minh ngay trong hôm nay và tuyệt đối "
+                             "không được nói với con cháu.")})
     return presets
 
 
@@ -182,12 +188,26 @@ async def api_case(request: Request):
     return J(c) if c else J({"error": "Không tìm thấy vụ việc"}, 404)
 
 
+def _pick_scenario(text: str, campaign_id: str | None) -> dict:
+    """Kịch bản ẩn của đường dây mà ScamBot (mô phỏng) sẽ dùng: theo preset nếu có, nếu không thì theo thủ đoạn
+    nhận diện từ câu mở đầu (ưu tiên kịch bản không chứa đòn prompt injection)."""
+    if campaign_id:
+        m = next((m for m in MESSAGES if m["campaign_id"] == campaign_id), None)
+        if m:
+            return m
+    low = _fold(text or "")
+    scores = {t: sum(_fold(k) in low for k in kws) for t, kws in TYPO_KEYWORDS.items()}
+    best = max(scores, key=scores.get) if scores and max(scores.values()) > 0 else None
+    pool = [m for m in MESSAGES[1:] if m["typology"] == best] or [m for m in MESSAGES if m["typology"] == best] or MESSAGES[1:]
+    return pool[0]
+
+
 async def api_honeypot(request: Request):
     body = await request.json()
-    cid = body.get("campaign_id")
-    msg = next((m for m in MESSAGES if m["campaign_id"] == cid), None) or random.choice(MESSAGES)
+    text = (body.get("text") or "").strip()
+    msg = _pick_scenario(text, body.get("campaign_id"))
     from starlette.concurrency import run_in_threadpool
-    return J(await run_in_threadpool(run_honeypot, msg))
+    return J(await run_in_threadpool(run_honeypot, msg, text or None))
 
 
 async def api_agent_try(request: Request):

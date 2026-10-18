@@ -55,6 +55,8 @@ body { background: var(--ink); }
 .btn-ghost { background: rgba(30, 41, 59, 0.6); border-color: rgba(51, 65, 85, 0.9); color: #e2e8f0; }
 .btn-ghost:hover:not(:disabled) { border-color: rgba(100, 116, 139, 1); }
 .btn-muted { background: rgba(51, 65, 85, 0.5); color: #cbd5e1; border-color: rgba(71, 85, 105, 0.8); }
+.btn.honeypot-hint { border-color: rgba(245, 158, 11, 0.9); color: #fde68a; box-shadow: 0 0 0 0 rgba(245, 158, 11, .6); animation: hint 1.6s infinite; }
+@keyframes hint { 0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, .55); } 70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); } 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
 .btn-danger { background: rgba(244, 63, 94, 0.12); border-color: rgba(244, 63, 94, 0.55); color: #fda4af; }
 .btn-danger:hover:not(:disabled) { background: rgba(244, 63, 94, 0.22); }
 .chip-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 9px; font-size: 12px; font-weight: 600;

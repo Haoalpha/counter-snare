@@ -11,17 +11,24 @@ const STAGES = [
 let network = null;
 let graphDrawn = false;
 let selectedPreset = null;
+let selectedCampaign = null; // kịch bản ẩn (mô phỏng) cho ScamBot khi chạy Honeypot
 
 export function initInvestigation() {
   renderStepper();
   const meta = state.meta;
   const presets = meta.presets || [];
   $("#presets").innerHTML = presets.map((p, i) =>
-    `<button class="chip-btn" data-preset="${i}"><i data-lucide="${p.id === "P3" ? "badge-check" : "flame"}" class="h-3.5 w-3.5"></i>Preset ${i + 1}: ${esc(p.label)}</button>`).join("");
+    `<button class="chip-btn" data-preset="${i}"><i data-lucide="${p.id === "P3" ? "badge-check" : p.honeypot ? "fish" : "flame"}" class="h-3.5 w-3.5"></i>Preset ${i + 1}: ${esc(p.label)}</button>`).join("");
   $$("[data-preset]").forEach((b) => b.onclick = () => choosePreset(+b.dataset.preset));
   $("#more-scenarios").innerHTML = `<option value="">— select —</option>` + meta.samples.map((s, i) =>
     `<option value="${i}">#${i + 1} ${esc(TYPOLOGY_EN[s.typology] || s.typology)}${i === 0 ? " (with injection)" : ""}</option>`).join("");
-  $("#more-scenarios").onchange = (e) => { if (e.target.value !== "") { $("#threat-input").value = meta.samples[e.target.value].text; selectedPreset = null; $$("[data-preset]").forEach((x) => x.classList.remove("selected")); } };
+  $("#more-scenarios").onchange = (e) => {
+    if (e.target.value === "") return;
+    const s = meta.samples[e.target.value];
+    $("#threat-input").value = s.text; selectedPreset = null; selectedCampaign = s.campaign_id;
+    $$("[data-preset]").forEach((x) => x.classList.remove("selected"));
+  };
+  $("#threat-input").addEventListener("input", () => { selectedCampaign = null; });
   if (presets.length) choosePreset(1); else $("#threat-input").value = meta.samples[0].text;
 
   $("#btn-execute").onclick = execute;
@@ -37,7 +44,10 @@ export function initInvestigation() {
 
 function choosePreset(i) {
   selectedPreset = i;
-  $("#threat-input").value = state.meta.presets[i].text;
+  const p = state.meta.presets[i];
+  selectedCampaign = p.campaign_id || state.meta.samples.find((s) => s.text === p.text)?.campaign_id || null;
+  $("#threat-input").value = p.text;
+  $("#btn-honeypot").classList.toggle("honeypot-hint", !!p.honeypot);
   $$("[data-preset]").forEach((x) => x.classList.toggle("selected", +x.dataset.preset === i));
   $("#more-scenarios").value = "";
 }
@@ -88,10 +98,10 @@ async function honeypot() {
   const b = $("#btn-honeypot");
   busy(b, true, "Decoy agent engaging scammer…");
   try {
-    const samples = state.meta.samples;
-    const text = $("#threat-input").value;
-    const match = samples.find((s) => text.includes(s.text.slice(0, 40))) || samples[0];
-    const h = await api("/api/honeypot", { campaign_id: match.campaign_id });
+    const text = $("#threat-input").value.trim();
+    if (!text) { toast("Paste the scammer's opening message first.", "error"); return; }
+    const h = await api("/api/honeypot", { text, campaign_id: selectedCampaign });
+    $("#btn-honeypot").classList.remove("honeypot-hint");
     const p = $("#honeypot-panel");
     p.classList.remove("hidden");
     p.innerHTML = `<div class="rounded-xl border border-slate-800/80 bg-slate-950/50 p-3">
@@ -102,6 +112,7 @@ async function honeypot() {
         <span class="font-mono text-sm text-white">${h.extracted_accounts.map(esc).join(", ")}</span>
         <button id="btn-hp-investigate" class="btn btn-primary ml-auto py-1.5 text-xs"><i data-lucide="play" class="h-3.5 w-3.5"></i>Investigate this transcript</button></div>`
         : `<div class="mt-3 badge b-rose">No account exposed yet</div>`}
+      ${h.opening_had_account ? `<p class="mt-2 text-[11.5px] text-amber-300">This message already contained a receiving account — Execute Analysis can investigate it directly; the decoy is most useful when the scammer has not revealed the account yet.</p>` : ""}
       <p class="mt-2 text-[11px] text-slate-500">Simulation only. In production the default mode is passive (customers forward scam chats); active baiting runs only under the SBV – Ministry of Public Security coordination framework.</p></div>`;
     icons();
     const go = $("#btn-hp-investigate");
@@ -137,7 +148,16 @@ function render(c) {
       ${it.impersonated_entity ? `<div><span class="text-slate-500">Impersonating:</span> ${esc(it.impersonated_entity)}</div>` : ""}
       ${(it.pressure_tactics || []).length ? `<div class="flex flex-wrap gap-1 pt-1">${it.pressure_tactics.slice(0, 4).map((x) => `<span class="badge b-amber">${esc(x)}</span>`).join("")}</div>` : ""}
       ${it.accounts_unknown && it.accounts_unknown.length ? `<div class="text-slate-500">Outside our bank: <span class="font-mono">${it.accounts_unknown.map(esc).join(", ")}</span></div>` : ""}
-    </div>` : `<div class="placeholder">No account belonging to the bank was found in this message — nothing to investigate.</div>`;
+    </div>` : `<div class="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 fade-in">
+      <div class="flex items-center gap-2 text-[12px] font-semibold text-amber-300"><i data-lucide="search-x" class="h-4 w-4"></i>No receiving account in this message yet</div>
+      <p class="mt-1 text-[12px] text-slate-300">${it.accounts_unknown && it.accounts_unknown.length
+        ? `Account(s) found are outside our bank: <span class="font-mono">${it.accounts_unknown.map(esc).join(", ")}</span>. Share with the receiving bank via SIMO.`
+        : "The scammer has only made first contact. Deploy the decoy agent to keep them talking until they reveal the mule account — then investigate the whole ring."}</p>
+      <div class="mt-1 text-[11.5px] text-slate-500">Typology so far: ${esc(TYPOLOGY_EN[it.typology] || it.typology)}</div>
+      ${it.accounts_unknown && it.accounts_unknown.length ? "" : `<button id="btn-suggest-honeypot" class="btn btn-ghost mt-2 py-1.5 text-xs"><i data-lucide="fish" class="h-3.5 w-3.5"></i>Deploy Honeypot Decoy Agent</button>`}
+    </div>`;
+  const sh = $("#btn-suggest-honeypot");
+  if (sh) sh.onclick = honeypot;
 
   $("#pipeline").innerHTML = (c.timeline || []).map((t) => `<li class="pipe-item fade-in"><i data-lucide="check-circle-2" class="h-4 w-4 text-emerald-400"></i>
     <span class="text-slate-200">${esc(stepEn(t.step))}</span><span class="ms">${t.ms} ms</span></li>`).join("");
@@ -149,6 +169,7 @@ function render(c) {
   renderStepper();
   icons();
   if (seeds.length) toast(c.status === "CLEARED" ? "Analysis complete: false positive — no mule ring." : `Analysis complete: ${c.ring.summary.n_mules} mule accounts mapped. Proceed to Stage 02.`);
+  else { toast("No receiving account yet — deploy the Honeypot Decoy Agent to make the scammer reveal it."); $("#btn-honeypot").classList.add("honeypot-hint"); }
 }
 
 // ---------------- stage 2 ----------------
