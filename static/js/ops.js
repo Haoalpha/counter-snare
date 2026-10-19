@@ -50,9 +50,8 @@ export async function initOps() {
     restore(addItem({ id: r.meta.inbox_id || r.case_id, channel: r.meta.channel || "app", channel_label: r.meta.channel_label || "Analyst manual entry",
       sender: r.meta.sender || "Analyst", text: r.meta.text || "", priority: "high" }, false), r);
   });
-  setInterval(() => { renderInbox(); renderTicker(); if (S.active) renderCaseHead(S.runs[S.active]); }, 1000);
+  setInterval(() => { renderInbox(); if (S.active) renderCaseHead(S.runs[S.active]); }, 1000);
   setInterval(autopilotTick, 2500);
-  renderTicker();
 }
 
 // ---------------- inbox ----------------
@@ -208,7 +207,6 @@ function onDone(run) {
   const r = run.result || {};
   if (r.status === "PENDING_APPROVAL" && !run.restored) toast(`${run.case_id}: ring mapped — ${(r.actions || []).length} actions await your approval.`);
   renderInbox();
-  renderTicker();
 }
 
 // ---------------- active case ----------------
@@ -265,10 +263,6 @@ function renderRoster(run) {
 function renderEmpty() {
   $("#stream").innerHTML = `<div class="empty"><span class="av" style="--c:#7A1238;width:52px;height:52px;margin:0 auto"><i data-lucide="workflow"></i></span>
     <h3>Agentic Thought Stream</h3>
-    <p>Every reasoning step, tool call, GreenNode MaaS request and policy decision is streamed here live. You hand over a threat — the
-      <b>Orchestrator</b> decides which agents to dispatch. Legal actions stop at your approval.</p>
-    <div class="flow"><div><b>Screen</b>Guardrails quarantine prompt-injection and mask PII.</div><div><b>Hunt</b>Ring Hunter expands the ledger graph from the seed.</div>
-      <div><b>Draft &amp; verify</b>STR drafted by the LLM, every number fact-checked.</div><div><b>Decide</b>Policy Gateway blocks the agent; you sign off.</div></div>
     <div class="flex flex-wrap justify-center gap-2"><button type="button" class="btn btn-primary" id="empty-top"><i data-lucide="play"></i>Investigate top-priority threat</button>
       <button type="button" class="btn btn-outline" id="empty-auto"><i data-lucide="bot"></i>Engage Autopilot</button></div></div>`;
   icons();
@@ -420,7 +414,7 @@ async function afterDecision(run) {
   refreshHitl(run);
   renderBoard(run, { animate: false });
   await poll(run.case_id, true);
-  renderInbox(); renderTicker();
+  renderInbox();
 }
 
 function refreshHitl(run) {
@@ -443,20 +437,6 @@ async function ask(q) {
     await poll(run.case_id, true);
   } catch (e) { toast(e.message, "error"); }
   finally { $("#copilot-send").disabled = false; }
-}
-
-// ---------------- ticker ----------------
-function renderTicker() {
-  const runs = Object.values(S.runs);
-  const res = runs.filter((r) => r.done && r.result).map((r) => r.result);
-  const pend = res.filter((r) => r.status === "PENDING_APPROVAL");
-  const traced = pend.reduce((a, r) => a + r.ring.summary.victim_loss, 0);
-  const remain = pend.reduce((a, r) => a + r.ring.summary.est_remaining, 0);
-  const awaiting = pend.reduce((a, r) => a + (r.actions || []).filter((x) => /CHỜ|CẦN/.test(x.status)).length, 0);
-  const t = (v, l, c = "") => `<div class="tick"><div class="v" style="${c ? `color:${c}` : ""}">${v}</div><div class="l">${l}</div></div>`;
-  $("#ticker").innerHTML = t(S.inbox.length, "Threats received") + t(runs.filter((r) => !r.done).length, "Under investigation", "#A16207")
-    + t(pend.length, "Mule rings mapped", "#BE123C") + t(vndShort(traced), "Victim funds traced") + t(vndShort(remain), "Recoverable (still in ring)", "#047857")
-    + t(res.filter((r) => r.status === "CLEARED").length, "False positives auto-closed", "#047857") + t(awaiting, "Actions awaiting you", awaiting ? "#7A1238" : "");
 }
 
 export function editOfficer() {

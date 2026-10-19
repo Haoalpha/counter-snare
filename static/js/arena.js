@@ -12,7 +12,6 @@ export async function initArena() {
   const al = ev.account_level;
   const k = (v, l) => `<div class="kpi"><div class="v text-emerald-700">${v}</div><div class="l">${l}</div></div>`;
   $("#eval-kpis").innerHTML = k(al.auc_roc.toFixed(3), "AUC-ROC") + k(pct(al["precision@0.5"]), "Precision") + k(pct(al["recall@0.5"]), `Recall · ${al.n_mules} mules`);
-  $("#eval-protocol").textContent = "Trained on 3 synthetic worlds (3 typologies); evaluated on an unseen world (different seed, plus an account-takeover typology never seen in training) and on independent Red-Arena seeds. Synthetic data → numbers are optimistic; production starts in shadow mode.";
   const rows = Object.entries(ev.arena).map(([lvl, v]) => {
     const d1 = v.v1.ring_recall_mean, d2 = v.v2.ring_recall_mean;
     const cell = (x) => `<div class="flex items-center gap-2"><div class="bar-track w-28"><div class="bar-fill" style="width:${x * 100}%;background:${x >= 0.8 ? "#059669" : x >= 0.4 ? "#d97706" : "#be123c"}"></div></div><span class="font-mono font-semibold">${pct(x)}</span></div>`;

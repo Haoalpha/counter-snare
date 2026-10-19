@@ -29,15 +29,11 @@
   <div class="topbar-inner">
     <div class="brand">
       <div class="brand-mark"><i data-lucide="shield-half" class="h-5 w-5"></i></div>
-      <div>
-        <div class="brand-name">COUNTER-SNARE</div>
-        <div class="brand-sub"><b>Trung tâm Tác chiến An ninh Tài chính</b> · Financial Security Operations Center</div>
-      </div>
+      <div class="brand-name">COUNTER-SNARE</div>
     </div>
-    <div id="status-pills" class="pills"></div>
     <button id="analyst-chip" class="analyst" type="button" aria-label="Set the duty AML officer name">
       <span class="avatar" id="analyst-initials">PC</span>
-      <span><b id="analyst-name">Set officer name</b><small>PCRT · AML duty desk</small></span>
+      <span><b id="analyst-name">Set officer name</b></span>
     </button>
   </div>
   <nav class="tabs" role="tablist" aria-label="Sections">
@@ -47,8 +43,6 @@
     <button class="tab-btn" data-tab="tab-governance" role="tab" aria-selected="false"><i data-lucide="shield-check"></i>Governance</button>
   </nav>
 </header>
-
-<div id="ticker" class="ticker" aria-label="Operations KPIs"></div>
 
 <main class="wrap">
 
@@ -61,7 +55,6 @@
         <div class="col-head">
           <div>
             <h2><span class="live" aria-hidden="true"></span>Threat Inbox <span id="inbox-count" class="badge b-slate">0</span></h2>
-            <p>Live intake · customer reports &amp; TM alerts <span class="mono">(synthetic)</span></p>
           </div>
           <label class="switch" title="When on, the Orchestrator picks up new threats by itself, highest priority first">
             <input id="autopilot" type="checkbox"><span class="track"></span><span>Autopilot</span>
@@ -112,11 +105,11 @@
         <div id="pane-network" class="pane">
           <div id="graph" role="img" aria-label="Money-flow and shared-device graph of the ring"></div>
           <div id="legend" class="legend"></div>
-          <div id="xai"><div class="ph">The ring graph grows here hop by hop while the Ring Hunter expands it. Click an account for its Shapley risk attribution.</div></div>
+          <div id="xai"></div>
         </div>
-        <div id="pane-evidence" class="pane" hidden><div class="ph">Deterministic evidence computed from the ledger appears here. The LLM can cite it but never edit it.</div></div>
-        <div id="pane-str" class="pane" hidden><div class="ph">The STR draft (Vietnamese, Luật PCRT 2022) is written by the Investigator Agent and fact-checked by the Judge Agent.</div></div>
-        <div id="pane-actions" class="pane" hidden><div class="ph">Legal actions proposed by the agents wait here for an AML officer.</div></div>
+        <div id="pane-evidence" class="pane" hidden></div>
+        <div id="pane-str" class="pane" hidden></div>
+        <div id="pane-actions" class="pane" hidden></div>
       </aside>
     </div>
   </section>
@@ -126,26 +119,20 @@
     <div class="grid gap-4 xl:grid-cols-3">
       <div class="glass xl:col-span-2">
         <div class="card-head"><i data-lucide="swords"></i>Adversarial Planning–Execution Simulation</div>
-        <p class="m-0 text-sm leading-relaxed text-muted">A <b class="text-wine-700">Red-Team LLM</b> plays the criminal mastermind and writes a laundering
-          <b>campaign plan</b> designed to evade detection. A deterministic <b>execution simulator</b> turns the plan into thousands of synthetic transactions
-          with complete ground-truth labels. The <b class="text-emerald-700">defender</b> must recover the ring from a single seed account.
-          Every campaign that slips through becomes training data — the model <b>self-evolves</b> without touching real customer data.</p>
-        <div class="mt-4 grid gap-2 sm:grid-cols-4">
-          <div class="flow-step"><i data-lucide="brain" class="text-rose-700"></i><b>1 · Plan</b><span>Red LLM designs evasion tactics</span></div>
-          <div class="flow-step"><i data-lucide="cpu" class="text-amber-700"></i><b>2 · Execute</b><span>Simulator emits labelled transactions</span></div>
-          <div class="flow-step"><i data-lucide="scan-search" class="text-sky-700"></i><b>3 · Hunt</b><span>Defender expands ring from 1 seed</span></div>
-          <div class="flow-step"><i data-lucide="refresh-cw" class="text-emerald-700"></i><b>4 · Evolve</b><span>Misses feed the next model</span></div>
+        <div class="grid gap-2 sm:grid-cols-4">
+          <div class="flow-step"><i data-lucide="brain" class="text-rose-700"></i><b>1 · Plan</b></div>
+          <div class="flow-step"><i data-lucide="cpu" class="text-amber-700"></i><b>2 · Execute</b></div>
+          <div class="flow-step"><i data-lucide="scan-search" class="text-sky-700"></i><b>3 · Hunt</b></div>
+          <div class="flow-step"><i data-lucide="refresh-cw" class="text-emerald-700"></i><b>4 · Evolve</b></div>
         </div>
       </div>
       <div class="glass">
         <div class="card-head"><i data-lucide="gauge"></i>Held-out Evaluation (unseen world)</div>
         <div id="eval-kpis" class="grid grid-cols-3 gap-2"></div>
-        <p id="eval-protocol" class="mb-0 mt-3 text-[11.5px] leading-relaxed text-muted"></p>
       </div>
     </div>
     <div class="glass mt-4">
-      <div class="card-head"><i data-lucide="trending-up"></i>Model Evolution: v1 Baseline vs v2 Self-Evolved
-        <span class="ml-auto text-[11px] font-normal normal-case tracking-normal text-muted">ring detection rate · mean over independent seeds</span></div>
+      <div class="card-head"><i data-lucide="trending-up"></i>Model Evolution: v1 Baseline vs v2 Self-Evolved</div>
       <div class="overflow-x-auto"><table id="evolution" class="data-table"></table></div>
     </div>
     <div class="mt-4 grid gap-4 xl:grid-cols-5">
@@ -184,15 +171,13 @@
         <div id="runtime" class="space-y-2 text-sm"></div>
       </div>
       <div class="glass bento-b">
-        <div class="card-head"><i data-lucide="activity"></i>MaaS LLM Gateway &amp; Rate Limits
-          <span class="ml-auto text-[11px] font-normal normal-case tracking-normal text-muted">60-second sliding window · per-user quotas</span></div>
+        <div class="card-head"><i data-lucide="activity"></i>MaaS LLM Gateway &amp; Rate Limits</div>
         <div id="rpm" class="space-y-3"></div>
         <div id="token-usage" class="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4"></div>
         <div class="mt-4 overflow-x-auto"><table id="routes" class="data-table"></table></div>
       </div>
       <div class="glass bento-c">
-        <div class="card-head"><i data-lucide="scroll-text"></i>Immutable Audit Trail
-          <span class="ml-auto font-mono text-[11px] font-normal normal-case tracking-normal text-muted">append-only · /api/audit · live</span></div>
+        <div class="card-head"><i data-lucide="scroll-text"></i>Immutable Audit Trail</div>
         <div class="max-h-[460px] overflow-auto"><table id="audit" class="data-table"></table></div>
       </div>
       <div class="glass bento-d">

@@ -150,7 +150,7 @@ function fmtVal(f, v) {
 function renderEvidence(v) {
   const ev = (v && v.evidence) || [];
   $("#cnt-evidence").textContent = ev.length;
-  $("#pane-evidence").innerHTML = ev.length ? `<div class="mb-2 text-[11.5px] text-muted">Computed deterministically from the ledger · the LLM may cite these tags but cannot edit them.</div>` + ev.map((e) =>
+  $("#pane-evidence").innerHTML = ev.length ? ev.map((e) =>
     `<div class="ev-card" id="vault-${esc(e.id)}"><div class="flex items-center gap-2"><span class="ev-tag">${esc(e.id)}</span><span class="lg">${esc(e.legal || "ledger fact")}</span></div>
       <div class="tx">${esc(e.text)}</div>${e.tx_ids && e.tx_ids.length ? `<div class="mt-1 font-mono text-[10.5px] text-muted">tx: ${e.tx_ids.slice(0, 4).map(esc).join(" · ")}</div>` : ""}</div>`).join("")
     : `<div class="ph">${v && v.status === "RUNNING" ? '<span class="spinner"></span> Evidence vault is being built…' : "No evidence for this case."}</div>`;
