@@ -34,6 +34,8 @@ ROUTES = {
     "judge": [GEMMA, QWEN, GLM52, GLM53],              # chấm rubric, nhanh
     "honeypot_batu": [GEMMA, QWEN, GLM52],             # hội thoại nhiều lượt -> model nhanh
     "honeypot_scambot": [QWEN, GEMMA, GLM52],
+    "copilot": [QWEN, GEMMA, GLM53],                   # hỏi–đáp có trích dẫn, cần nhanh
+    "threat_sim": [GEMMA, QWEN, GLM53],                # sinh mối đe dọa mô phỏng (đẩy sang Gemma để dành Qwen cho điều tra)
     "default": [GLM53, QWEN, GEMMA, GLM52],
 }
 EXTRA_BODY = {QWEN: {"enable_thinking": False}}       # tắt suy luận để giảm độ trễ (GLM không hỗ trợ tắt)
@@ -137,6 +139,9 @@ class LLM:
                 return None
             tried.add(model)
             t0 = time.time()
+            if case_id:
+                from .events import emit
+                emit(case_id, type="llm", status="start", purpose=purpose, model=model)
             try:
                 budget = max_tokens + (3000 if model in REASONING_MODELS else 0)
                 resp = self._client.chat.completions.create(model=model, messages=messages, max_tokens=budget,

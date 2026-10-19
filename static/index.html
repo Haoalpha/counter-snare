@@ -1,18 +1,21 @@
 <!doctype html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>COUNTER-SNARE · Mule Ring Hunter</title>
-<meta name="description" content="Autonomous Mule Ring Hunter & STR Intelligence Platform on GreenNode AgentBase">
+<title>COUNTER-SNARE · Ops Center</title>
+<meta name="description" content="COUNTER-SNARE — Trung tâm Tác chiến An ninh Tài chính: autonomous multi-agent mule-ring hunting and STR drafting on GreenNode AgentBase">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script>
   tailwind.config = {
+    corePlugins: { preflight: false },
     theme: { extend: {
-      fontFamily: { sans: ['"Fira Sans"', 'system-ui', 'sans-serif'], mono: ['"Fira Code"', 'ui-monospace', 'monospace'] },
-      colors: { ink: '#0b0f19' },
+      fontFamily: { sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'], mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'] },
+      colors: { ink: '#2A0E19', muted: '#7B5E68', line: '#EADBDD', paper: '#FBF7F5', cream: '#F7F1EE',
+        wine: { 50: '#FBF1F4', 100: '#F6E1E8', 600: '#7A1238', 700: '#6B1235', 800: '#5A0F2E', 900: '#3A0A1F' }, gold: { 600: '#A16207' } },
     } }
   };
 </script>
@@ -20,272 +23,198 @@
 <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
 <link rel="stylesheet" href="/static/css/app.css">
 </head>
-<body class="h-full bg-ink text-slate-200 font-sans antialiased">
-<div class="bg-grid fixed inset-0 -z-10 pointer-events-none"></div>
+<body>
 
-<!-- ================= TOP NAVIGATION ================= -->
-<header class="sticky top-0 z-40 border-b border-slate-800/80 bg-ink/85 backdrop-blur-md">
-  <div class="mx-auto max-w-[1600px] px-4 lg:px-6">
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 py-3">
-      <div class="flex items-center gap-3">
-        <div class="grid h-10 w-10 place-items-center rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-400">
-          <i data-lucide="scan-eye" class="h-5 w-5"></i>
-        </div>
-        <div>
-          <div class="flex items-center gap-3">
-            <span class="text-xl font-extrabold tracking-[0.18em] text-white">COUNTER-SNARE</span>
-            <span class="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-emerald-400">
-              <span class="pulse-dot"></span>SYSTEM ONLINE
-            </span>
-          </div>
-          <div class="text-[11px] text-slate-400">Autonomous Mule Ring Hunter &amp; STR Intelligence Platform
-            <span class="text-slate-600">•</span> Track C: Risk, Compliance &amp; Fraud Defense
-            <span class="text-slate-600">•</span> <span class="text-cyan-400">GreenNode AgentBase Native</span></div>
-        </div>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark"><i data-lucide="shield-half" class="h-5 w-5"></i></div>
+      <div>
+        <div class="brand-name">COUNTER-SNARE</div>
+        <div class="brand-sub"><b>Trung tâm Tác chiến An ninh Tài chính</b> · Financial Security Operations Center</div>
       </div>
-      <div id="telemetry" class="ml-auto flex flex-wrap items-center gap-2 text-[11px]"></div>
     </div>
-    <nav class="-mb-px flex gap-1 overflow-x-auto" role="tablist">
-      <button class="tab-btn active" data-tab="tab-investigation" role="tab"><i data-lucide="workflow" class="h-4 w-4"></i>Investigation Pipeline</button>
-      <button class="tab-btn" data-tab="tab-arena" role="tab"><i data-lucide="swords" class="h-4 w-4"></i>Red Arena</button>
-      <button class="tab-btn" data-tab="tab-triage" role="tab"><i data-lucide="filter" class="h-4 w-4"></i>Alert Triage</button>
-      <button class="tab-btn" data-tab="tab-governance" role="tab"><i data-lucide="shield-check" class="h-4 w-4"></i>Governance &amp; Observability</button>
-    </nav>
+    <div id="status-pills" class="pills"></div>
+    <button id="analyst-chip" class="analyst" type="button" aria-label="Set the duty AML officer name">
+      <span class="avatar" id="analyst-initials">PC</span>
+      <span><b id="analyst-name">Set officer name</b><small>PCRT · AML duty desk</small></span>
+    </button>
   </div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab-btn active" data-tab="tab-ops" role="tab" aria-selected="true"><i data-lucide="radar"></i>Operations Center</button>
+    <button class="tab-btn" data-tab="tab-arena" role="tab" aria-selected="false"><i data-lucide="swords"></i>Red Arena</button>
+    <button class="tab-btn" data-tab="tab-triage" role="tab" aria-selected="false"><i data-lucide="filter"></i>Alert Triage</button>
+    <button class="tab-btn" data-tab="tab-governance" role="tab" aria-selected="false"><i data-lucide="shield-check"></i>Governance</button>
+  </nav>
 </header>
 
-<main class="mx-auto max-w-[1600px] px-4 py-6 lg:px-6">
+<div id="ticker" class="ticker" aria-label="Operations KPIs"></div>
 
-  <!-- ================= TAB 1: INVESTIGATION PIPELINE ================= -->
-  <section id="tab-investigation" class="tab-panel">
-    <ol id="stepper" class="mb-6 grid grid-cols-2 gap-2 lg:grid-cols-4"></ol>
+<main class="wrap">
 
-    <!-- STAGE 01 -->
-    <div class="stage" data-stage="1">
-      <div class="grid gap-5 xl:grid-cols-3">
-        <div class="glass xl:col-span-2">
-          <div class="card-head"><i data-lucide="radar" class="h-4 w-4 text-cyan-400"></i>Threat Ingestion Console
-            <span class="ml-auto font-mono text-[10px] text-slate-500">customer-forwarded scam message / TM alert</span></div>
-          <div id="presets" class="flex flex-wrap gap-2"></div>
-          <div class="mt-3 flex items-center gap-2">
-            <label for="more-scenarios" class="text-xs text-slate-500">More synthetic scenarios</label>
-            <select id="more-scenarios" class="input max-w-xs py-1.5 text-xs"></select>
+  <!-- ================= OPERATIONS CENTER ================= -->
+  <section id="tab-ops" class="tab-panel">
+    <div class="ops-grid">
+
+      <!-- Threat inbox -->
+      <aside class="col card" aria-label="Threat inbox">
+        <div class="col-head">
+          <div>
+            <h2><span class="live" aria-hidden="true"></span>Threat Inbox <span id="inbox-count" class="badge b-slate">0</span></h2>
+            <p>Live intake · customer reports &amp; TM alerts <span class="mono">(synthetic)</span></p>
           </div>
-          <textarea id="threat-input" rows="7" class="input mt-3 font-mono text-[13px] leading-relaxed" spellcheck="false"
-                    placeholder="Paste a scam message, chat transcript or transaction-monitoring alert…"></textarea>
-          <div class="mt-3 flex flex-wrap items-center gap-2">
-            <button id="btn-execute" class="btn btn-primary"><i data-lucide="play" class="h-4 w-4"></i>Execute Analysis</button>
-            <button id="btn-honeypot" class="btn btn-ghost" title="Use when the scam message has no receiving account yet"><i data-lucide="fish" class="h-4 w-4"></i>Deploy Honeypot Decoy Agent</button>
-            <span class="ml-auto text-[11px] text-slate-500">100% synthetic data · no real customer data</span>
-          </div>
-          <div class="mt-2 grid gap-1 text-[11.5px] text-slate-500 sm:grid-cols-2">
-            <div><i data-lucide="play" class="mr-1 inline h-3 w-3 text-emerald-400"></i><b class="text-slate-300">Execute Analysis</b> — message already contains the receiving (mule) account.</div>
-            <div><i data-lucide="fish" class="mr-1 inline h-3 w-3 text-amber-400"></i><b class="text-slate-300">Honeypot Decoy</b> — scammer made first contact only; a decoy persona makes them reveal the account (simulation).</div>
-          </div>
-          <div id="honeypot-panel" class="mt-4 hidden"></div>
+          <label class="switch" title="When on, the Orchestrator picks up new threats by itself, highest priority first">
+            <input id="autopilot" type="checkbox"><span class="track"></span><span>Autopilot</span>
+          </label>
         </div>
+        <div id="inbox" class="inbox-list"></div>
+        <form id="composer" class="composer">
+          <label for="composer-text">Report a new threat</label>
+          <textarea id="composer-text" class="input" rows="3" placeholder="Paste any scam message, call transcript or TM alert (Vietnamese or English)…"></textarea>
+          <div class="composer-row">
+            <select id="composer-channel" class="input" aria-label="Intake channel">
+              <option value="app">Mobile app · Report scam</option><option value="zalo">Zalo forward</option><option value="hotline">Hotline call transcript</option>
+              <option value="email">Email to fraud desk</option><option value="branch">Branch counter report</option><option value="tm">TM alert (internal)</option>
+            </select>
+            <button type="submit" class="btn btn-primary"><i data-lucide="send"></i>Dispatch</button>
+          </div>
+          <div class="composer-row">
+            <button type="button" id="btn-sim" class="btn btn-outline btn-sm flex-1" title="LLM writes a brand-new scam message for a random ring in the synthetic ledger"><i data-lucide="dices"></i>Simulate unseen threat</button>
+            <button type="button" id="btn-sim-fc" class="btn btn-outline btn-sm flex-1" title="Scammer's first contact, no account revealed yet"><i data-lucide="phone-incoming"></i>First contact</button>
+          </div>
+        </form>
+      </aside>
 
-        <div class="space-y-5">
-          <div class="glass">
-            <div class="card-head"><i data-lucide="shield-half" class="h-4 w-4 text-emerald-400"></i>Zero-Trust Guardrails</div>
-            <div id="guardrails" class="space-y-2 text-sm text-slate-400">
-              <div class="placeholder">Guardrail verdicts appear after <b>Execute Analysis</b>.</div>
-            </div>
+      <!-- Agentic thought stream -->
+      <section class="col card" aria-label="Agentic thought stream">
+        <div id="roster" class="roster" aria-label="Agent roster"></div>
+        <div id="case-head" class="case-head"></div>
+        <div id="stream" class="stream" aria-live="polite"></div>
+        <form id="copilot" class="copilot">
+          <div id="suggest" class="suggest"></div>
+          <div class="row">
+            <label for="copilot-q" class="sr-only">Ask the Analyst Copilot</label>
+            <input id="copilot-q" class="input" placeholder="Ask the Copilot about this case — answers cite the evidence vault only" autocomplete="off" disabled>
+            <button class="btn btn-primary" type="submit" id="copilot-send" disabled><i data-lucide="sparkles"></i>Ask</button>
           </div>
-          <div class="glass">
-            <div class="card-head"><i data-lucide="crosshair" class="h-4 w-4 text-rose-400"></i>Seed Intelligence</div>
-            <div id="seed-card" class="text-sm text-slate-400"><div class="placeholder">Regex-first seed extraction — the LLM may only select from regex candidates.</div></div>
-          </div>
-          <div class="glass">
-            <div class="card-head"><i data-lucide="git-branch" class="h-4 w-4 text-purple-400"></i>Agent Graph Execution <span id="pipeline-total" class="ml-auto font-mono text-[11px] text-slate-500"></span></div>
-            <ol id="pipeline" class="space-y-1.5 text-[13px]"></ol>
-          </div>
+        </form>
+      </section>
+
+      <!-- Case board -->
+      <aside class="col card board-col" aria-label="Case board">
+        <div id="board-kpis" class="board-kpis"></div>
+        <div class="seg" role="tablist" aria-label="Case board views">
+          <button class="active" data-pane="pane-network" role="tab"><i data-lucide="network" class="h-4 w-4"></i>Network</button>
+          <button data-pane="pane-evidence" role="tab"><i data-lucide="vault" class="h-4 w-4"></i>Evidence <span class="count" id="cnt-evidence">0</span></button>
+          <button data-pane="pane-str" role="tab"><i data-lucide="file-text" class="h-4 w-4"></i>STR draft</button>
+          <button data-pane="pane-actions" role="tab"><i data-lucide="gavel" class="h-4 w-4"></i>Actions <span class="count" id="cnt-actions">0</span></button>
         </div>
-      </div>
-      <div class="mt-5 flex justify-end"><button class="btn btn-ghost next-stage" data-go="2" disabled>Proceed to Stage 02 <i data-lucide="arrow-right" class="h-4 w-4"></i></button></div>
+        <div id="pane-network" class="pane">
+          <div id="graph" role="img" aria-label="Money-flow and shared-device graph of the ring"></div>
+          <div id="legend" class="legend"></div>
+          <div id="xai"><div class="ph">The ring graph grows here hop by hop while the Ring Hunter expands it. Click an account for its Shapley risk attribution.</div></div>
+        </div>
+        <div id="pane-evidence" class="pane" hidden><div class="ph">Deterministic evidence computed from the ledger appears here. The LLM can cite it but never edit it.</div></div>
+        <div id="pane-str" class="pane" hidden><div class="ph">The STR draft (Vietnamese, Luật PCRT 2022) is written by the Investigator Agent and fact-checked by the Judge Agent.</div></div>
+        <div id="pane-actions" class="pane" hidden><div class="ph">Legal actions proposed by the agents wait here for an AML officer.</div></div>
+      </aside>
     </div>
-
-    <!-- STAGE 02 -->
-    <div class="stage hidden" data-stage="2">
-      <div id="kpis" class="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7"></div>
-      <div class="grid gap-5 xl:grid-cols-5">
-        <div class="glass xl:col-span-3">
-          <div class="card-head"><i data-lucide="network" class="h-4 w-4 text-cyan-400"></i>Forensic Network Graph
-            <span class="ml-auto text-[11px] text-slate-500">money flow + shared devices · click a node</span></div>
-          <div id="legend" class="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400"></div>
-          <div id="graph" class="h-[520px] rounded-xl border border-slate-800/80 bg-slate-950/70"></div>
-        </div>
-        <div class="glass xl:col-span-2">
-          <div class="card-head"><i data-lucide="brain-circuit" class="h-4 w-4 text-amber-400"></i>Explainable Risk Attribution (XAI)</div>
-          <div id="xai" class="text-sm text-slate-400"><div class="placeholder">Select an account on the graph.</div></div>
-        </div>
-      </div>
-      <div class="glass mt-5">
-        <div class="card-head"><i data-lucide="table-2" class="h-4 w-4 text-slate-400"></i>Ring Ledger <span class="ml-auto text-[11px] text-slate-500">accessible tabular view of the graph</span></div>
-        <div class="overflow-x-auto"><table id="ledger" class="data-table"></table></div>
-      </div>
-      <div class="mt-5 flex justify-between">
-        <button class="btn btn-ghost next-stage" data-go="1"><i data-lucide="arrow-left" class="h-4 w-4"></i>Stage 01</button>
-        <button class="btn btn-ghost next-stage" data-go="3">Proceed to Stage 03 <i data-lucide="arrow-right" class="h-4 w-4"></i></button>
-      </div>
-    </div>
-
-    <!-- STAGE 03 -->
-    <div class="stage hidden" data-stage="3">
-      <div id="judge-banner" class="mb-5"></div>
-      <div class="grid gap-5 xl:grid-cols-5">
-        <div class="glass xl:col-span-2">
-          <div class="card-head"><i data-lucide="vault" class="h-4 w-4 text-emerald-400"></i>Deterministic Evidence Vault
-            <span class="ml-auto text-[11px] text-slate-500">computed from ledger data · LLM cannot edit</span></div>
-          <div id="vault" class="max-h-[720px] space-y-2 overflow-y-auto pr-1"></div>
-        </div>
-        <div class="glass xl:col-span-3">
-          <div class="card-head"><i data-lucide="file-text" class="h-4 w-4 text-cyan-400"></i>Automated STR Dossier Draft
-            <span id="str-meta" class="ml-auto text-[11px] text-slate-500"></span></div>
-          <div id="dossier"></div>
-        </div>
-      </div>
-      <div class="mt-5 flex justify-between">
-        <button class="btn btn-ghost next-stage" data-go="2"><i data-lucide="arrow-left" class="h-4 w-4"></i>Stage 02</button>
-        <button class="btn btn-ghost next-stage" data-go="4">Proceed to Stage 04 <i data-lucide="arrow-right" class="h-4 w-4"></i></button>
-      </div>
-    </div>
-
-    <!-- STAGE 04 -->
-    <div class="stage hidden" data-stage="4">
-      <div class="grid gap-5 xl:grid-cols-3">
-        <div class="glass xl:col-span-2">
-          <div class="card-head"><i data-lucide="send" class="h-4 w-4 text-emerald-400"></i>Action Dispatcher</div>
-          <div class="flex flex-wrap gap-2">
-            <button id="act-dismiss" class="btn btn-muted"><i data-lucide="circle-off" class="h-4 w-4"></i>Dismiss False Positive</button>
-            <button id="act-export" class="btn btn-primary"><i data-lucide="file-down" class="h-4 w-4"></i>Export STR Dossier for Review</button>
-          </div>
-          <div class="danger-zone mt-5">
-            <div class="mb-2 flex items-center gap-2 font-mono text-[11px] font-semibold tracking-widest text-rose-400"><i data-lucide="triangle-alert" class="h-4 w-4"></i>DANGER ZONE · LEGAL ACTIONS</div>
-            <div class="flex flex-wrap gap-2">
-              <button class="btn btn-danger" data-danger="submit_str"><i data-lucide="landmark" class="h-4 w-4"></i>Direct Submit STR to FIU</button>
-              <button class="btn btn-danger" data-danger="delay_transactions"><i data-lucide="timer-off" class="h-4 w-4"></i>Delay Transactions (Art. 44)</button>
-              <button class="btn btn-danger" data-danger="freeze_account"><i data-lucide="snowflake" class="h-4 w-4"></i>Instant Account Freeze</button>
-            </div>
-            <p class="mt-2 text-[11px] text-slate-500">Each request is first sent <b>as the autonomous agent</b> to the Policy Gateway — watch what happens.</p>
-          </div>
-          <div class="mt-5">
-            <div class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Case Action Register</div>
-            <div class="overflow-x-auto"><table id="action-register" class="data-table"></table></div>
-          </div>
-        </div>
-        <div class="glass">
-          <div class="card-head"><i data-lucide="user-check" class="h-4 w-4 text-amber-400"></i>Human-in-the-Loop Ledger</div>
-          <ol id="hitl-log" class="space-y-2 text-[13px] text-slate-400"><li class="placeholder">No officer decisions yet.</li></ol>
-        </div>
-      </div>
-      <div class="mt-5"><button class="btn btn-ghost next-stage" data-go="3"><i data-lucide="arrow-left" class="h-4 w-4"></i>Stage 03</button></div>
-    </div>
-
-    <div id="empty-hint" class="hidden"></div>
   </section>
 
-  <!-- ================= TAB 2: RED ARENA ================= -->
-  <section id="tab-arena" class="tab-panel hidden">
-    <div class="grid gap-5 xl:grid-cols-3">
+  <!-- ================= RED ARENA ================= -->
+  <section id="tab-arena" class="tab-panel" hidden>
+    <div class="grid gap-4 xl:grid-cols-3">
       <div class="glass xl:col-span-2">
-        <div class="card-head"><i data-lucide="swords" class="h-4 w-4 text-rose-400"></i>Adversarial Planning–Execution Simulation</div>
-        <p class="text-sm leading-relaxed text-slate-400">A <span class="text-rose-400">Red-Team LLM</span> plays the criminal mastermind and writes a laundering
+        <div class="card-head"><i data-lucide="swords"></i>Adversarial Planning–Execution Simulation</div>
+        <p class="m-0 text-sm leading-relaxed text-muted">A <b class="text-wine-700">Red-Team LLM</b> plays the criminal mastermind and writes a laundering
           <b>campaign plan</b> designed to evade detection. A deterministic <b>execution simulator</b> turns the plan into thousands of synthetic transactions
-          with complete ground-truth labels. The <span class="text-emerald-400">defender</span> must recover the ring from a single seed account.
+          with complete ground-truth labels. The <b class="text-emerald-700">defender</b> must recover the ring from a single seed account.
           Every campaign that slips through becomes training data — the model <b>self-evolves</b> without touching real customer data.</p>
         <div class="mt-4 grid gap-2 sm:grid-cols-4">
-          <div class="flow-step"><i data-lucide="brain" class="h-4 w-4 text-rose-400"></i><b>1 · Plan</b><span>Red LLM designs evasion tactics</span></div>
-          <div class="flow-step"><i data-lucide="cpu" class="h-4 w-4 text-amber-400"></i><b>2 · Execute</b><span>Simulator emits labelled transactions</span></div>
-          <div class="flow-step"><i data-lucide="scan-search" class="h-4 w-4 text-cyan-400"></i><b>3 · Hunt</b><span>Defender expands ring from 1 seed</span></div>
-          <div class="flow-step"><i data-lucide="refresh-cw" class="h-4 w-4 text-emerald-400"></i><b>4 · Evolve</b><span>Misses feed the next model</span></div>
+          <div class="flow-step"><i data-lucide="brain" class="text-rose-700"></i><b>1 · Plan</b><span>Red LLM designs evasion tactics</span></div>
+          <div class="flow-step"><i data-lucide="cpu" class="text-amber-700"></i><b>2 · Execute</b><span>Simulator emits labelled transactions</span></div>
+          <div class="flow-step"><i data-lucide="scan-search" class="text-sky-700"></i><b>3 · Hunt</b><span>Defender expands ring from 1 seed</span></div>
+          <div class="flow-step"><i data-lucide="refresh-cw" class="text-emerald-700"></i><b>4 · Evolve</b><span>Misses feed the next model</span></div>
         </div>
       </div>
       <div class="glass">
-        <div class="card-head"><i data-lucide="gauge" class="h-4 w-4 text-emerald-400"></i>Held-out Evaluation (unseen world)</div>
+        <div class="card-head"><i data-lucide="gauge"></i>Held-out Evaluation (unseen world)</div>
         <div id="eval-kpis" class="grid grid-cols-3 gap-2"></div>
-        <p id="eval-protocol" class="mt-3 text-[11px] leading-relaxed text-slate-500"></p>
+        <p id="eval-protocol" class="mb-0 mt-3 text-[11.5px] leading-relaxed text-muted"></p>
       </div>
     </div>
-    <div class="glass mt-5">
-      <div class="card-head"><i data-lucide="trending-up" class="h-4 w-4 text-emerald-400"></i>Model Evolution: v1 Baseline vs v2 Self-Evolved
-        <span class="ml-auto text-[11px] text-slate-500">ring detection rate · mean over independent seeds</span></div>
+    <div class="glass mt-4">
+      <div class="card-head"><i data-lucide="trending-up"></i>Model Evolution: v1 Baseline vs v2 Self-Evolved
+        <span class="ml-auto text-[11px] font-normal normal-case tracking-normal text-muted">ring detection rate · mean over independent seeds</span></div>
       <div class="overflow-x-auto"><table id="evolution" class="data-table"></table></div>
     </div>
-    <div class="mt-5 grid gap-5 xl:grid-cols-5">
+    <div class="mt-4 grid gap-4 xl:grid-cols-5">
       <div class="glass xl:col-span-3">
-        <div class="card-head"><i data-lucide="terminal" class="h-4 w-4 text-emerald-400"></i>Live Engagement Console
-          <div class="ml-auto flex items-center gap-2">
-            <select id="arena-diff" class="input py-1 text-xs"><option value="de">Easy</option><option value="vua" selected>Medium</option><option value="kho">Hard</option></select>
-            <label class="flex items-center gap-1 text-[11px] text-slate-400"><input id="arena-llm" type="checkbox" checked class="accent-rose-500">Red LLM planner</label>
-            <button id="btn-arena" class="btn btn-danger py-1.5 text-xs"><i data-lucide="zap" class="h-3.5 w-3.5"></i>Launch Engagement</button>
+        <div class="card-head"><i data-lucide="terminal"></i>Live Engagement Console
+          <div class="ml-auto flex flex-wrap items-center gap-2 font-normal normal-case tracking-normal">
+            <select id="arena-diff" class="input w-auto py-1 text-xs" aria-label="Adversary level"><option value="de">Easy</option><option value="vua" selected>Medium</option><option value="kho">Hard</option></select>
+            <label class="flex items-center gap-1 text-[11.5px] text-muted"><input id="arena-llm" type="checkbox" checked style="accent-color:#7A1238">Red LLM planner</label>
+            <button id="btn-arena" class="btn btn-primary btn-sm"><i data-lucide="zap"></i>Launch Engagement</button>
           </div>
         </div>
         <pre id="terminal" class="terminal" aria-live="polite">counter-snare@red-arena:~$ awaiting engagement…</pre>
       </div>
       <div class="glass xl:col-span-2">
-        <div class="card-head"><i data-lucide="list-checks" class="h-4 w-4 text-cyan-400"></i>Unseen-World Ring Recovery</div>
+        <div class="card-head"><i data-lucide="list-checks"></i>Unseen-World Ring Recovery</div>
         <div class="overflow-x-auto"><table id="ring-eval" class="data-table"></table></div>
       </div>
     </div>
   </section>
 
-  <!-- ================= TAB 3: ALERT TRIAGE ================= -->
-  <section id="tab-triage" class="tab-panel hidden">
+  <!-- ================= ALERT TRIAGE ================= -->
+  <section id="tab-triage" class="tab-panel" hidden>
     <div id="triage-kpis" class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8"></div>
-    <div class="glass mt-5">
-      <div class="card-head"><i data-lucide="filter" class="h-4 w-4 text-cyan-400"></i>Legacy Rule Alerts → Agent Disposition
-        <select id="triage-filter" class="input ml-auto max-w-[240px] py-1 text-xs"></select></div>
+    <div class="glass mt-4">
+      <div class="card-head"><i data-lucide="filter"></i>Legacy Rule Alerts → Agent Disposition
+        <select id="triage-filter" class="input ml-auto w-auto max-w-[260px] py-1 text-xs font-normal normal-case tracking-normal" aria-label="Filter by disposition"></select></div>
       <div class="max-h-[640px] overflow-auto"><table id="triage-table" class="data-table"></table></div>
     </div>
   </section>
 
-  <!-- ================= TAB 4: GOVERNANCE ================= -->
-  <section id="tab-governance" class="tab-panel hidden">
+  <!-- ================= GOVERNANCE ================= -->
+  <section id="tab-governance" class="tab-panel" hidden>
     <div class="bento">
       <div class="glass bento-a">
-        <div class="card-head"><i data-lucide="server" class="h-4 w-4 text-emerald-400"></i>Runtime Telemetry</div>
+        <div class="card-head"><i data-lucide="server"></i>Runtime Telemetry</div>
         <div id="runtime" class="space-y-2 text-sm"></div>
       </div>
       <div class="glass bento-b">
-        <div class="card-head"><i data-lucide="activity" class="h-4 w-4 text-cyan-400"></i>MaaS LLM Gateway &amp; Rate Limit Dashboard
-          <span class="ml-auto text-[11px] text-slate-500">60-second sliding window · per-user quotas</span></div>
+        <div class="card-head"><i data-lucide="activity"></i>MaaS LLM Gateway &amp; Rate Limits
+          <span class="ml-auto text-[11px] font-normal normal-case tracking-normal text-muted">60-second sliding window · per-user quotas</span></div>
         <div id="rpm" class="space-y-3"></div>
         <div id="token-usage" class="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4"></div>
         <div class="mt-4 overflow-x-auto"><table id="routes" class="data-table"></table></div>
       </div>
       <div class="glass bento-c">
-        <div class="card-head"><i data-lucide="scroll-text" class="h-4 w-4 text-amber-400"></i>Immutable Audit Trail
-          <span class="ml-auto font-mono text-[11px] text-slate-500">append-only · /api/audit · live</span></div>
+        <div class="card-head"><i data-lucide="scroll-text"></i>Immutable Audit Trail
+          <span class="ml-auto font-mono text-[11px] font-normal normal-case tracking-normal text-muted">append-only · /api/audit · live</span></div>
         <div class="max-h-[460px] overflow-auto"><table id="audit" class="data-table"></table></div>
       </div>
       <div class="glass bento-d">
-        <div class="card-head"><i data-lucide="lock-keyhole" class="h-4 w-4 text-rose-400"></i>Policy Group <span id="pg-name" class="ml-2 font-mono text-[11px] text-slate-500"></span></div>
+        <div class="card-head"><i data-lucide="lock-keyhole"></i>Policy Group <span id="pg-name" class="font-mono text-[11px] font-normal normal-case tracking-normal text-muted"></span></div>
         <div class="overflow-x-auto"><table id="policy" class="data-table"></table></div>
       </div>
       <div class="glass bento-e">
-        <div class="card-head"><i data-lucide="boxes" class="h-4 w-4 text-purple-400"></i>Reference Architecture on GreenNode</div>
+        <div class="card-head"><i data-lucide="boxes"></i>Reference Architecture on GreenNode</div>
         <div id="architecture"></div>
       </div>
     </div>
   </section>
 </main>
 
-<!-- ================= POLICY INTERCEPTOR MODAL ================= -->
-<div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-  <div class="modal-card w-full max-w-2xl rounded-2xl bg-slate-950 p-6">
-    <div class="flex items-start gap-3">
-      <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-rose-500/15 text-rose-400"><i data-lucide="octagon-x" class="h-6 w-6"></i></div>
-      <div class="min-w-0 flex-1">
-        <div id="modal-title" class="font-mono text-sm font-bold tracking-wider text-rose-400">POLICY INTERCEPTOR — FIRST MATCH WINS: DENY</div>
-        <div id="modal-body" class="mt-3 space-y-3 text-sm text-slate-300"></div>
-      </div>
-      <button id="modal-close" class="btn btn-ghost px-2 py-1" aria-label="Close"><i data-lucide="x" class="h-4 w-4"></i></button>
-    </div>
+<div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-card">
+    <div class="mh"><i data-lucide="pen-line" class="h-5 w-5"></i><h3 id="modal-title">Officer sign-off</h3>
+      <button id="modal-close" class="btn btn-ghost btn-sm ml-auto" style="color:#fff" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+    <form id="modal-form"><div id="modal-body" class="mb"></div><div id="modal-foot" class="mf"></div></form>
   </div>
 </div>
-
-<div id="toast" class="fixed bottom-4 right-4 z-50 hidden max-w-sm rounded-xl border border-slate-700 bg-slate-900/95 px-4 py-3 text-sm text-slate-200 shadow-2xl"></div>
+<div id="toast" class="toast" hidden role="status"></div>
 
 <script type="module" src="/static/js/main.js"></script>
 </body>

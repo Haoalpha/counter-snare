@@ -38,9 +38,13 @@ from app.bank import Bank  # noqa: E402
 from app.honeypot import run_honeypot  # noqa: E402
 from app.llm import llm  # noqa: E402
 from app.memory import ring_memory  # noqa: E402
+from app.copilot import answer as copilot_answer  # noqa: E402
+from app.events import emit  # noqa: E402
 from app.model import MuleModel, np_default  # noqa: E402
+from app.orchestrator import RUNS, run_autonomous  # noqa: E402
 from app.policy import OFFICER, POLICY_GROUP, TOOL_DESCRIPTIONS, PolicyDenied, call_tool, evaluate  # noqa: E402
 from app.simulator import TYPOLOGIES  # noqa: E402
+from app.threatsim import simulate  # noqa: E402
 from app.triage import triage  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
@@ -100,6 +104,40 @@ def _build_presets() -> list[dict]:
 
 
 PRESETS = _build_presets()
+
+
+def _build_inbox() -> list[dict]:
+    """Luồng mối đe dọa đến (dữ liệu tổng hợp): báo cáo khách hàng từ nhiều kênh + cảnh báo TM của hệ thống giám sát theo luật.
+    Mức ưu tiên là ưu tiên TIẾP NHẬN theo luật đơn giản (số tiền, kênh) – không chứa kết luận điều tra."""
+    by_id = {p["id"]: p for p in PRESETS}
+    by_camp = {m["campaign_id"]: m for m in MESSAGES}
+    items = []
+
+    def add(channel, label, sender, text, delay, priority, **kw):
+        items.append({"id": f"TH-{len(items) + 1:03d}", "channel": channel, "channel_label": label, "sender": sender, "text": text,
+                      "arrive_after_s": delay, "priority": priority, "synthetic": True, **kw})
+
+    add("app", "Mobile app · Report scam", "Customer ••• 4471", by_id["P1"]["text"], 0, "high")
+    add("zalo", "Zalo forward", "Customer ••• 0932", MESSAGES[0]["text"], 0, "critical")
+    add("tm", "TM rules engine · TM-01", "Transaction monitoring", by_id["P3"]["text"], 0, "medium")
+    add("hotline", "Hotline 1900 call transcript", "Customer ••• 7710", by_id["P4"]["text"], 20, "high",
+        campaign_id=by_id["P4"]["campaign_id"])
+    add("email", "Email to fraud desk", "Customer ••• 2208", by_camp.get("C04", MESSAGES[3])["text"], 45, "high")
+    alerts = TRIAGE["alerts"]
+    esc = next((a for a in alerts if a["decision"] == "LEO THANG" and a["account_id"] not in {m["seed_account"] for m in MESSAGES}), None)
+    fp = next((a for a in alerts if a["decision"].startswith("ĐÓNG") and a["segment"] != "HE_THONG"), None)
+    for a, delay in ((esc, 75), (fp, 140)):
+        if a:
+            codes = ", ".join(r.split(":")[0] for r in a["rules"])
+            add("tm", f"TM rules engine · {codes}", "Transaction monitoring",
+                f"[CẢNH BÁO {codes} – hệ thống giám sát theo luật] Tài khoản {a['account_id']} ngân hàng NHX ({a['holder']}, phân khúc "
+                f"{a['segment']}) kích hoạt quy tắc: " + "; ".join(a["rules"]) + ". Đề nghị rà soát.", delay, "medium")
+    add("branch", "Branch counter report", "Teller · CN Quận 3", by_camp.get("C02", MESSAGES[1])["text"], 105, "high")
+    add("sms", "SMS forward", "Customer ••• 5163", by_camp.get("C06", MESSAGES[-1])["text"], 180, "medium")
+    return items
+
+
+INBOX = _build_inbox()
 
 app = GreenNodeAgentBaseApp()
 
@@ -233,6 +271,10 @@ async def api_approve(request: Request):
     if not act:
         return J({"error": "Không tìm thấy hành động"}, 404)
     tool = act["tool"]
+    if body.get("decision") == "reject":
+        act["status"] = f"TỪ CHỐI bởi {officer}" + (f" – {body['note'][:200]}" if body.get("note") else "")
+        audit.log("human_rejection", case_id=case["case_id"], officer=officer, tool=tool, action_id=act["id"])
+        return J({"ok": True, "action": act})
     if tool == "freeze_account" and not (body.get("authority_decision") or "").strip():
         return J({"error": "Phong tỏa chỉ thực hiện khi có số quyết định của cơ quan có thẩm quyền (Điều 45)"}, 400)
     try:
@@ -244,6 +286,78 @@ async def api_approve(request: Request):
         act["status"] += f" theo QĐ {body['authority_decision']}"
     audit.log("human_approval", case_id=case["case_id"], officer=officer, tool=tool, action_id=act["id"])
     return J({"ok": True, "action": act})
+
+
+# ---------------- Ops Center (autonomous) ----------------
+def _ops_worker(case_id: str, text: str, meta: dict) -> None:
+    try:
+        res = run_autonomous(INVESTIGATOR, case_id, text, meta, _pick_scenario)
+        _store(res)
+        RUNS.finish(case_id, res)
+        emit(case_id, type="done", status=res["status"])
+    except Exception as e:  # không để luồng chết im lặng: báo lỗi lên Thought Stream
+        emit(case_id, type="thought", agent="Orchestrator", level="alert", text=f"Run failed: {type(e).__name__}: {str(e)[:200]}")
+        RUNS.finish(case_id, {"case_id": case_id, "status": "ERROR", "error": str(e)[:300]})
+        emit(case_id, type="done", status="ERROR")
+
+
+async def api_ops_run(request: Request):
+    body = await request.json()
+    text = (body.get("text") or "").strip()[:4000]
+    if not text:
+        return J({"error": "Thiếu nội dung mối đe dọa"}, 400)
+    from app.agents import _now_case_id
+    case_id = _now_case_id()
+    meta = {k: body.get(k) for k in ("inbox_id", "channel", "channel_label", "sender", "campaign_id", "origin") if body.get(k)}
+    meta.setdefault("channel_label", "Analyst manual entry")
+    meta["text"] = text[:600]
+    RUNS.create(case_id, meta)
+    threading.Thread(target=_ops_worker, args=(case_id, text, meta), daemon=True).start()
+    return J({"case_id": case_id})
+
+
+async def api_ops_events(request: Request):
+    try:
+        after = max(0, int(request.query_params.get("after", "0")))
+    except ValueError:
+        after = 0
+    r = RUNS.get(request.path_params["case_id"], after)
+    return J(r) if r else J({"error": "Không tìm thấy lượt chạy"}, 404)
+
+
+async def api_ops_runs(request: Request):
+    return J({"runs": RUNS.list()})
+
+
+async def api_ops_inbox(request: Request):
+    return J({"items": INBOX, "synthetic": True, "server_time": datetime.now().isoformat(timespec="seconds")})
+
+
+async def api_ops_simulate(request: Request):
+    body = await request.json()
+    kind = "first_contact" if body.get("kind") == "first_contact" else "report"
+    from starlette.concurrency import run_in_threadpool
+    t = await run_in_threadpool(simulate, BANK, CAMPAIGNS, kind)
+    t["id"] = "SIM-" + datetime.now().strftime("%H%M%S")
+    t["sender"] = "Threat simulator (synthetic)"
+    t["priority"] = "high"
+    t.pop("typology_hint", None)  # không lộ đáp án cho agent / giao diện
+    return J(t)
+
+
+async def api_ops_copilot(request: Request):
+    body = await request.json()
+    case = CASES.get(body.get("case_id", ""))
+    if not case:
+        return J({"error": "Không tìm thấy vụ việc"}, 404)
+    from starlette.concurrency import run_in_threadpool
+    return J(await run_in_threadpool(copilot_answer, case, body.get("question", "")))
+
+
+async def api_ops_status(request: Request):
+    runs = RUNS.list()
+    return J({"llm_enabled": llm.enabled, "rate_limits": llm.limiter.snapshot(), "running": sum(not r["done"] for r in runs),
+              "cases": len(runs), "memory_backend": ring_memory.backend})
 
 
 async def api_triage(request: Request):
@@ -291,6 +405,13 @@ app.router.routes.extend([
     Route("/api/agent_try", api_agent_try, methods=["POST"]),
     Route("/api/approve", api_approve, methods=["POST"]),
     Route("/api/triage", api_triage, methods=["GET"]),
+    Route("/api/ops/run", api_ops_run, methods=["POST"]),
+    Route("/api/ops/events/{case_id}", api_ops_events, methods=["GET"]),
+    Route("/api/ops/runs", api_ops_runs, methods=["GET"]),
+    Route("/api/ops/inbox", api_ops_inbox, methods=["GET"]),
+    Route("/api/ops/simulate", api_ops_simulate, methods=["POST"]),
+    Route("/api/ops/copilot", api_ops_copilot, methods=["POST"]),
+    Route("/api/ops/status", api_ops_status, methods=["GET"]),
     Route("/api/arena", api_arena, methods=["POST"]),
     Route("/api/eval", api_eval, methods=["GET"]),
     Route("/api/llm_status", api_llm_status, methods=["GET"]),

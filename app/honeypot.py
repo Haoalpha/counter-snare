@@ -27,31 +27,35 @@ def scambot_system(msg: dict, opening: str) -> str:
     )
 
 
-def run_honeypot(msg: dict, opening: str | None = None, max_turns: int = 5) -> dict:
+def run_honeypot(msg: dict, opening: str | None = None, max_turns: int = 5, case_id: str = "", on_turn=None) -> dict:
     """msg: kịch bản ẩn của đường dây (chứa tài khoản nhận tiền); opening: câu mở đầu thật của kẻ gian (từ ô nhập).
     Khi không có opening, dùng câu đầu tiên của kịch bản."""
     transcript = []
     opening = (opening or "").strip()[:500] or (msg["text"].split(". ")[0] + ".")
     opening_had_account = bool(extract_candidates(opening)["accounts"])
+    say = on_turn or (lambda t: None)
     transcript.append({"who": "scammer", "text": opening})
+    say(transcript[-1])
     found = extract_candidates(opening)["accounts"]
     mode = "llm" if llm.enabled else "scripted"
     if llm.enabled:
         scam_hist = [{"role": "system", "content": scambot_system(msg, opening)}, {"role": "assistant", "content": opening}]
         batu_hist = [{"role": "system", "content": BATU_SYSTEM}, {"role": "user", "content": opening}]
         for turn in range(max_turns):
-            reply = llm.chat(batu_hist, purpose="honeypot_batu", max_tokens=200, temperature=0.7)
+            reply = llm.chat(batu_hist, purpose="honeypot_batu", max_tokens=200, temperature=0.7, case_id=case_id)
             if not reply:
                 mode = "scripted"
                 break
             transcript.append({"who": "batu", "text": reply})
+            say(transcript[-1])
             batu_hist.append({"role": "assistant", "content": reply})
             scam_hist.append({"role": "user", "content": reply})
-            s = llm.chat(scam_hist, purpose="honeypot_scambot", max_tokens=250, temperature=0.7)
+            s = llm.chat(scam_hist, purpose="honeypot_scambot", max_tokens=250, temperature=0.7, case_id=case_id)
             if not s:
                 mode = "scripted"
                 break
             transcript.append({"who": "scammer", "text": s})
+            say(transcript[-1])
             scam_hist.append({"role": "assistant", "content": s})
             batu_hist.append({"role": "user", "content": s})
             found = extract_candidates(" ".join(t["text"] for t in transcript if t["who"] == "scammer"))["accounts"]
@@ -69,6 +73,10 @@ def run_honeypot(msg: dict, opening: str | None = None, max_turns: int = 5) -> d
             {"who": "batu", "text": "Bà ghi rồi, để bà đi ra ngân hàng gần nhà nhờ cháu nhân viên chuyển giúp nghe con."},
         ]
         found = extract_candidates(" ".join(t["text"] for t in transcript if t["who"] == "scammer"))["accounts"]
+        if on_turn:
+            on_turn({"who": "system", "text": "Live dialogue unavailable — replaying deterministic decoy script."})
+            for t in transcript[1:]:
+                on_turn(t)
     audit.log("honeypot", mode=mode, turns=len(transcript), extracted=len(found))
     scam_text = "\n".join(t["text"] for t in transcript if t["who"] == "scammer")
     return {"mode": mode, "transcript": transcript, "extracted_accounts": found, "scam_text": scam_text,

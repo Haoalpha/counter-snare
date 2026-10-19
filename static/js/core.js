@@ -25,23 +25,49 @@ export function busy(btn, on, label) {
 
 export function toast(msg, kind = "info") {
   const t = $("#toast");
-  t.className = "fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl fade-in " +
-    (kind === "error" ? "border-rose-500/50 bg-rose-950/90 text-rose-100" : "border-slate-700 bg-slate-900/95 text-slate-200");
+  t.className = "toast" + (kind === "error" ? " error" : "");
   t.textContent = msg;
+  t.hidden = false;
   clearTimeout(t._h);
-  t._h = setTimeout(() => t.classList.add("hidden"), 4200);
+  t._h = setTimeout(() => { t.hidden = true; }, 4200);
 }
 
 // Graph roles: categorical colour + distinct shape (never colour alone)
 export const ROLE = {
-  collector: { en: "Collection Hub", color: "#f43f5e", shape: "diamond", badge: "b-rose" },
-  layer: { en: "Transit Mule", color: "#f59e0b", shape: "dot", badge: "b-amber" },
-  cashout: { en: "Cash-out Point", color: "#c084fc", shape: "triangle", badge: "b-purple" },
-  victim: { en: "Victim", color: "#38bdf8", shape: "square", badge: "b-cyan" },
-  victim_ato: { en: "Compromised Account", color: "#22d3ee", shape: "triangleDown", badge: "b-cyan" },
-  sink: { en: "Crypto Off-ramp / ATM", color: "#64748b", shape: "box", badge: "b-slate" },
-  related: { en: "Related", color: "#475569", shape: "dot", badge: "b-slate" },
+  collector: { en: "Collection Hub", color: "#BE123C", shape: "diamond", badge: "b-rose" },
+  layer: { en: "Transit Mule", color: "#D97706", shape: "dot", badge: "b-amber" },
+  cashout: { en: "Cash-out Point", color: "#7C3AED", shape: "triangle", badge: "b-purple" },
+  victim: { en: "Victim", color: "#0284C7", shape: "square", badge: "b-cyan" },
+  victim_ato: { en: "Compromised Account", color: "#0891B2", shape: "triangleDown", badge: "b-cyan" },
+  sink: { en: "Crypto Off-ramp / ATM", color: "#64748B", shape: "box", badge: "b-slate" },
+  related: { en: "Related", color: "#A08C93", shape: "dot", badge: "b-slate" },
 };
+
+// Agent roster: avatar colour + icon (Lucide)
+export const AGENTS = {
+  "Orchestrator": { icon: "workflow", c: "#7A1238" },
+  "Guardrail Agent": { icon: "shield-half", c: "#047857" },
+  "Intel Agent": { icon: "scan-search", c: "#0369A1" },
+  "Ring Hunter": { icon: "network", c: "#BE123C" },
+  "Risk Engine": { icon: "gauge", c: "#B45309" },
+  "Decoy Agent": { icon: "fish", c: "#A16207" },
+  "Investigator Agent": { icon: "file-pen-line", c: "#4338CA" },
+  "Judge Agent": { icon: "scale", c: "#0F766E" },
+  "Policy Gateway": { icon: "lock-keyhole", c: "#5A0F2E" },
+  "Memory Agent": { icon: "database", c: "#7E22CE" },
+  "Triage Agent": { icon: "filter", c: "#047857" },
+  "Analyst Copilot": { icon: "sparkles", c: "#334155" },
+};
+export const avatar = (name, cls = "av") => { const a = AGENTS[name] || { icon: "bot", c: "#7B5E68" };
+  return `<span class="${cls}" style="--c:${a.c}"><i data-lucide="${a.icon}"></i></span>`; };
+
+export const MODEL_SHORT = { "z-ai/glm-5.3-flash-thirdparty": "GLM 5.3 Flash", "z-ai/glm-5.2-hackathon": "GLM 5.2", "qwen/qwen3.8-flash": "Qwen 3.8 Flash", "google/gemma-4-31b-it": "Gemma 4 31B" };
+
+export function englishStatus(s) {
+  if (/ĐÃ DUYỆT bởi/.test(s)) return "APPROVED · " + s.replace(/^ĐÃ DUYỆT bởi\s*/, "").replace(" – đã nộp NHNN (mô phỏng)", " · filed (simulated)");
+  if (/TỪ CHỐI bởi/.test(s)) return "REJECTED · " + s.replace(/^TỪ CHỐI bởi\s*/, "");
+  return { "CHỜ CHUYÊN VIÊN DUYỆT": "PENDING OFFICER APPROVAL", "KHUYẾN NGHỊ": "RECOMMENDED", "CẦN QUYẾT ĐỊNH CƠ QUAN CÓ THẨM QUYỀN": "REQUIRES AUTHORITY DECISION" }[s] || s;
+}
 
 export const TYPOLOGY_EN = {
   gia_danh_cong_an: "Law-enforcement impersonation scam",
@@ -84,4 +110,4 @@ export const TOOL_EN = {
   notify_victims: { label: "Notify Victim Customers", legal: "Bảo vệ khách hàng" },
 };
 
-export const state = { meta: null, caseData: null, stage: 1, maxStage: 1 };
+export const state = { meta: null };

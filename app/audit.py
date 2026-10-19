@@ -15,6 +15,12 @@ class Audit:
         ev = {"ts": datetime.now().isoformat(timespec="seconds"), "kind": kind, **data}
         with self._lock:
             self._events.append(ev)
+        if data.get("case_id"):  # chuyển tiếp sang Agentic Thought Stream của vụ việc
+            from .events import emit
+            payload = {k: v for k, v in data.items() if k != "case_id"}
+            if "type" in payload:
+                payload["subtype"] = payload.pop("type")
+            emit(data["case_id"], type="audit", kind=kind, **payload)
         return ev
 
     def list(self, case_id: str | None = None, limit: int = 300) -> list[dict]:

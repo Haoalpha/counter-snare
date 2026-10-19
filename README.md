@@ -39,19 +39,24 @@ Chạy trên **GreenNode AgentBase** (Runtime, Container Registry, Memory, IAM) 
 | Nền tảng đa-model [LLM Suite](https://www.ciodive.com/news/JPMorgan-Chase-LLM-Suite-generative-ai-employee-tool/726772/) | LLM Gateway định tuyến theo tác vụ trên 4 model MaaS, giới hạn RPM theo quy định BTC |
 | [Chặn "rogue agents"](https://fortune.com/2026/10/15/jamie-dimon-ai-agents-meta-muse-jpmorgan/) (10/2026) | Agent zero-trust: chỉ đọc & soạn thảo, mọi tool qua gateway, ghi kiểm toán |
 
-## 3. Giao diện (Fintech Dark Mode · Cyber Defense · Data-Dense)
+## 3. Trung tâm Tác chiến An ninh Tài chính (Ops Center)
 
-Thiết kế theo hệ thống gợi ý của bộ skill *UI/UX Pro Max* (Dark Mode OLED, Fira Sans/Fira Code, icon SVG Lucide, focus state rõ, tôn trọng reduced-motion,
-responsive 375–1440px; đồ thị mạng phân loại bằng **màu + hình dạng** kèm bảng Ring Ledger thay thế). UI tiếng Anh chuẩn fintech; STR và căn cứ luật giữ tiếng Việt.
+Không có nút "preset", không có stepper bắt người dắt tay AI. Người dùng (hoặc **Autopilot**) đưa một mối đe dọa vào; **Orchestrator tự quyết định**
+cử agent nào, theo kịch bản nào, và mọi bước được phát trực tiếp lên **Agentic Thought Stream**:
 
-| Tab | Nội dung |
-|---|---|
-| **Investigation Pipeline** | Stepper 4 giai đoạn: 01 Threat Ingestion & Zero-Trust Guardrails · 02 Mule Ring Hunter & Forensic Graph (XAI) · 03 Forensic Evidence & STR Synthesis · 04 Policy Gate & HITL (Policy Interceptor modal) |
-| **Red Arena** | Cơ chế mô phỏng đối kháng, bảng tiến hóa v1 → v2, console giao chiến trực tiếp |
-| **Alert Triage** | Cảnh báo luật truyền thống → quyết định của agent, có giải thích |
-| **Governance & Observability** | Runtime telemetry, MaaS gateway & RPM theo cửa sổ trượt 60s, token usage, audit trail append-only, Policy Group, kiến trúc |
+- **Threat Inbox (trực tiếp)**: báo cáo khách hàng từ nhiều kênh (app, Zalo, hotline, email, quầy) và cảnh báo TM của hệ thống giám sát theo luật đến dần theo thời gian;
+  ô *Report a new threat* nhận bất kỳ văn bản nào; **Simulate unseen threat** để LLM viết một tin nhắn lừa đảo **mới hoàn toàn** cho một đường dây ngẫu nhiên trong sổ cái
+  (chứng minh hệ thống không trả JSON dựng sẵn). Bật **Autopilot** để Orchestrator tự nhận việc theo mức ưu tiên.
+- **Orchestrator tự chọn playbook**: có tài khoản trong sổ cái → điều tra; **chưa lộ tài khoản → tự cử Decoy Agent** (persona "Bà Tư", mô phỏng LLM-đối-LLM) đến khi kẻ gian đọc
+  ra tài khoản rồi tự quay lại điều tra; tài khoản ngân hàng khác → chuyển SIMO/liên ngân hàng; không có đường dây → đóng dương tính giả kèm lý do.
+- **Agentic Thought Stream**: suy nghĩ của từng agent, **tool call** (tham số, kết quả, ms), **lệnh gọi GreenNode MaaS** (model, độ trễ, token), quyết định **Policy Gateway**
+  (ALLOW/DENY), hội thoại mồi nhử từng lượt, và **thẻ phê duyệt Human-in-the-Loop** ngay trong luồng (Approve / Reject, phong tỏa cần số quyết định cơ quan có thẩm quyền).
+  Kỹ thuật: event bus (`app/events.py`) + run store, giao diện polling `GET /api/ops/events/{case}?after=N`.
+- **Case Board**: KPI, đồ thị đường dây **mọc dần theo từng hop**, Shapley XAI từng tài khoản, kho bằng chứng EV-xx, dự thảo STR có chứng nhận Judge, sổ hành động.
+- **Analyst Copilot**: hỏi đáp về vụ việc bằng tiếng Việt/Anh, **chỉ được trích kho bằng chứng** (mã EV không tồn tại bị gỡ), qua guardrail chống prompt injection, không có quyền hành động.
 
-4 preset demo: *Phishing Investment Scam*, *Fast Multi-hop Laundering* (kèm đòn prompt injection), *False Positive – Corporate Payroll* (tự đóng, không sinh STR), *Opening Contact – No Account Yet* (kẻ gian mới tiếp cận, chưa lộ tài khoản: Execute Analysis gợi ý **Honeypot Decoy Agent**, persona mồi nhử dùng chính tin nhắn trong ô nhập để dụ kẻ gian đọc ra tài khoản mule rồi điều tra cả đường dây).
+Thiết kế theo bộ skill *UI/UX Pro Max*: giao diện ngân hàng sáng (đỏ burgundy + be nhạt), IBM Plex Sans/Mono, icon SVG Lucide, focus rõ, tôn trọng reduced-motion,
+responsive 375–1760px; đồ thị phân loại bằng **màu + hình dạng**. Các tab khác: **Red Arena**, **Alert Triage**, **Governance** (runtime, RPM, audit trail, Policy Group, kiến trúc).
 
 ## 4. Tuân thủ quy định kỹ thuật của BTC
 
@@ -89,10 +94,13 @@ Triển khai thật bắt đầu bằng **shadow mode** trên dữ liệu ngân 
 ## 7. Kiến trúc trên GreenNode
 
 ```
-Analyst console (UI) ──► AgentBase Runtime (Custom Agent, container :8080)
-                           ├─ GET /health · POST /invocations (AgentBase SDK) · GET / + /static + /api/*
-                           ├─ LangGraph: Guardrail → Intel → Ring Hunter ─┬─► Investigator → Judge → Policy → Memory
-                           │                                              └─► False-positive closure (no STR)
+Ops Center (UI) ──► AgentBase Runtime (Custom Agent, container :8080)
+                      ├─ GET /health · POST /invocations (AgentBase SDK) · GET / + /static + /api/* + /api/ops/*
+                      ├─ Orchestrator (playbook) ─┬─► Decoy Agent (khi chưa lộ tài khoản) ─┐
+                      │                           └──────────────────────────────────────────┴─► LangGraph:
+                      │      Guardrail → Intel → Ring Hunter ─┬─► Investigator → Judge → Policy → Memory
+                      │                                       └─► False-positive closure (no STR)
+                      ├─ Event bus → Agentic Thought Stream · Analyst Copilot (grounded on EV-xx)
                            ├─► GreenNode MaaS qua LLM Gateway (định tuyến theo tác vụ + RPM guard), bge-m3 (RAG)
                            └─► AgentBase Memory (ring fingerprints)
 Image: build → push AgentBase Container Registry (vcr.vngcloud.vn) → runtime PUBLIC
@@ -105,7 +113,7 @@ python -m venv .venv && .venv/Scripts/pip install -r requirements.txt   # Linux/
 python -m scripts.build_assets        # sinh dữ liệu tổng hợp, huấn luyện, đánh giá -> data/
 cp .env.example .env                  # điền LLM_API_KEY (GreenNode MaaS); để trống = chế độ offline
 python main.py                        # http://localhost:8080
-python -m pytest -q                   # 16 bài kiểm thử (end-to-end, false-positive, honeypot, Shapley, rate limit)
+python -m pytest -q                   # 19 bài kiểm thử (end-to-end, orchestrator tự chủ, copilot, false-positive, honeypot, Shapley, rate limit)
 ```
 
 Gọi agent theo chuẩn AgentBase:
@@ -127,6 +135,6 @@ Deploy: xem `deploy/DEPLOY.md` (`deploy/agentbase.py deploy` = build → push vC
   ScamBot/VictimBot (arXiv 2601.03134); bộ sinh Tide (arXiv 2601.21446) cho thấy GBM cạnh tranh tốt với GNN trên dữ liệu AML.
 - **Mã nguồn**: toàn bộ code viết trong Build Week (16–21/10/2026), có hỗ trợ của công cụ lập trình AI (Claude Code).
   Thư viện mã nguồn mở: LangGraph, OpenAI Python SDK (gọi endpoint OpenAI-compatible của GreenNode), scikit-learn, pandas, Starlette/uvicorn;
-  giao diện: Tailwind CSS (CDN), vis-network, Lucide icons, Google Fonts (Fira Sans/Fira Code). SDK nền tảng: `greennode-agentbase`.
+  giao diện: Tailwind CSS (CDN), vis-network, Lucide icons, Google Fonts (IBM Plex Sans/Mono). SDK nền tảng: `greennode-agentbase`.
 - **Mô hình**: GreenNode MaaS – `qwen/qwen3.8-flash`, `google/gemma-4-31b-it`, `z-ai/glm-5.3-flash-thirdparty`, `z-ai/glm-5.2-hackathon`, `baai/bge-m3`; mô hình chấm điểm mule tự huấn luyện trên dữ liệu tổng hợp.
 - **Không chứa** key/credential/password trong repo (`.env`, `.env.runtime`, `.greennode.json` nằm trong `.gitignore`).

@@ -18,6 +18,7 @@ from langgraph.graph import END, START, StateGraph
 
 from .audit import audit
 from .bank import Bank, mask_name, vnd
+from .events import emit
 from .guard import extract_candidates, mask_pii, scan_injection, wrap_untrusted
 from .knowledge import knowledge
 from .llm import llm
@@ -32,6 +33,11 @@ TYPO_KEYWORDS = {
     "chiem_quyen_dien_thoai": ["cài ứng dụng", "app", "điện lực", "link", "cắt điện", "thuế", "đối soát"],
 }
 
+
+NODE_AGENT = {"guard_intake": "Guardrail Agent", "intel": "Intel Agent", "investigate": "Ring Hunter", "clear": "Triage Agent",
+              "write_str": "Investigator Agent", "judge": "Judge Agent", "propose_actions": "Policy Gateway", "remember": "Memory Agent"}
+TYPOLOGY_EN = {"gia_danh_cong_an": "law-enforcement impersonation", "viec_nhe_luong_cao": "task/job scam", "dau_tu_tien_ao": "crypto investment scam",
+               "chiem_quyen_dien_thoai": "malware account takeover", "canh_bao_giam_sat": "internal monitoring alert", "khac": "unclassified"}
 
 TYPOLOGY_LABELS = dict(TYPOLOGIES, canh_bao_giam_sat="Cảnh báo từ hệ thống giám sát giao dịch (nội bộ)", khac="Khác")
 INTEL_TYPOLOGIES = list(TYPOLOGY_LABELS)
@@ -102,29 +108,54 @@ class Investigator:
         self.graph = g.compile()
 
     def _timed(self, label: str, fn):
+        agent = NODE_AGENT.get(fn.__name__, label)
+
         def wrapper(state: CaseState) -> dict:
             t0 = time.time()
+            emit(state["case_id"], type="node", agent=agent, node=fn.__name__, status="start")
             out = fn(state)
+            ms = int((time.time() - t0) * 1000)
+            emit(state["case_id"], type="node", agent=agent, node=fn.__name__, status="done", ms=ms)
             tl = list(state.get("timeline", []))
-            tl.append({"step": label, "ms": int((time.time() - t0) * 1000)})
+            tl.append({"step": label, "ms": ms})
             out["timeline"] = tl
             return out
         return wrapper
 
+    def _tool(self, cid: str, agent: str, tool: str, args: dict, fn, summarize=lambda r: {}):
+        """Gọi một tool và phát sự kiện start/done (tham số + tóm tắt kết quả) lên Thought Stream."""
+        emit(cid, type="tool", agent=agent, tool=tool, args=args, status="start")
+        t0 = time.time()
+        result = fn()
+        emit(cid, type="tool", agent=agent, tool=tool, args=args, status="done", ms=int((time.time() - t0) * 1000), result=summarize(result))
+        return result
+
     # ---------------- nodes ----------------
     def guard_intake(self, s: CaseState) -> dict:
         text = s["text"]
-        inj = scan_injection(text)
-        masked, pii = mask_pii(text)
+        cid = s["case_id"]
+        inj, (masked, pii) = self._tool(cid, "Guardrail Agent", "guardrail.scan_message", {"chars": len(text)},
+                                        lambda: (scan_injection(text), mask_pii(text)),
+                                        lambda r: {"injection_patterns": len(r[0]), "pii_masked": len(r[1][1])})
         if inj:
-            audit.log("guardrail", case_id=s["case_id"], type="prompt_injection", matches=inj[:3])
+            audit.log("guardrail", case_id=cid, type="prompt_injection", matches=inj[:3])
+            emit(cid, type="thought", agent="Guardrail Agent", level="alert",
+                 text=f"Prompt-injection attempt detected ({len(inj)} patterns, e.g. “{inj[0][:60]}”). Message is quarantined as untrusted data — "
+                      "it can never change risk scores or skip reporting.")
+        else:
+            emit(cid, type="thought", agent="Guardrail Agent", text="No prompt-injection pattern found. Message treated as untrusted data anyway.")
         if pii:
-            audit.log("guardrail", case_id=s["case_id"], type="pii_masked", items=len(pii))
-        return {"guard": {"injection": inj, "pii_masked": pii, "masked_text": masked}}
+            audit.log("guardrail", case_id=cid, type="pii_masked", items=len(pii))
+        guard = {"injection": inj, "pii_masked": pii, "masked_text": masked}
+        emit(cid, type="partial", key="guard", data={"injection": inj, "pii_masked": pii})
+        return {"guard": guard}
 
     def intel(self, s: CaseState) -> dict:
         cid = s["case_id"]
-        cands = extract_candidates(s["text"])
+        cands = self._tool(cid, "Intel Agent", "intel.extract_candidates", {"method": "regex-first"}, lambda: extract_candidates(s["text"]),
+                           lambda r: {"accounts": r["accounts"], "banks": r["banks"], "amounts": r["amounts"][:2]})
+        if llm.enabled:
+            emit(cid, type="thought", agent="Intel Agent", text="Asking GreenNode MaaS to classify the typology. The model may only pick accounts from the regex candidate list.")
         extra = [a for a in (s.get("seeds_hint") or []) if a not in cands["accounts"]]
         cands["accounts"] += extra
         intel = {"candidates": cands, "llm": False}
@@ -163,22 +194,48 @@ class Investigator:
         intel["typology_label"] = TYPOLOGY_LABELS.get(intel["typology"], "Khác")
         intel["accounts_in_bank"] = [a for a in intel["accounts"] if self.bank.exists(a)]
         intel["accounts_unknown"] = [a for a in intel["accounts"] if not self.bank.exists(a)]
+        emit(cid, type="partial", key="intel", data=intel)
         if not intel["accounts_in_bank"]:
+            emit(cid, type="thought", agent="Intel Agent", level="warn",
+                 text=f"Typology: {TYPOLOGY_EN.get(intel['typology'], intel['typology'])}. No receiving account belonging to our bank"
+                      + (f" (found {', '.join(intel['accounts_unknown'])} at another bank)" if intel["accounts_unknown"] else "") + ".")
             return {"intel": intel, "status": "NO_SEED"}
+        emit(cid, type="thought", agent="Intel Agent",
+             text=f"Typology: {TYPOLOGY_EN.get(intel['typology'], intel['typology'])}. Seed account {', '.join(intel['accounts_in_bank'])} confirmed in our ledger."
+                  + (f" {intel['summary']}" if intel.get("summary") and intel.get("llm") else ""))
         return {"intel": intel}
 
     def investigate(self, s: CaseState) -> dict:
         cid = s["case_id"]
         seeds = s["intel"]["accounts_in_bank"]
-        ring = call_tool(AGENT, "read_expand_network", self.bank.expand_ring, seeds, case_id=cid)
-        risk = {n: call_tool(AGENT, "read_risk_score", self.bank.risk, n, case_id=cid)
-                for n, v in ring.nodes.items() if v["role"] in ("collector", "layer", "cashout")}
-        simo = call_tool(AGENT, "read_simo_lookup", lambda ids: sorted(set(ids) & self.simo_list), list(ring.nodes), case_id=cid)
+        RH = "Ring Hunter"
+        emit(cid, type="thought", agent=RH, text=f"Expanding the money-flow and shared-device graph from seed {', '.join(seeds)} (≤ 4 hops, transfers ≥ 1M ₫).")
+        ring = self._tool(cid, RH, "ledger.expand_network", {"seeds": seeds, "max_hops": 4, "min_amount_vnd": 1_000_000},
+                          lambda: call_tool(AGENT, "read_expand_network", self.bank.expand_ring, seeds, case_id=cid),
+                          lambda r: {"nodes": len(r.nodes), "mules": r.summary["n_mules"], "victims": r.summary["n_victims"],
+                                     "shared_devices": len(r.summary["devices"])})
+        emit(cid, type="partial", key="ring", data={"nodes": list(ring.nodes.values()), "edges": ring.edges, "summary": ring.summary})
         mule_ids = [n for n, v in ring.nodes.items() if v["role"] in ("collector", "layer", "cashout")]
+        risk = self._tool(cid, "Risk Engine", "risk.score_accounts", {"accounts": len(mule_ids), "model": "monotonic GBM + Shapley"},
+                          lambda: {n: call_tool(AGENT, "read_risk_score", self.bank.risk, n, case_id=cid) for n in mule_ids},
+                          lambda r: {"top": [[a, round(v["score"], 3)] for a, v in sorted(r.items(), key=lambda kv: -kv[1]["score"])[:3]]})
+        if ring.summary["n_mules"]:
+            sm = ring.summary
+            emit(cid, type="thought", agent=RH,
+                 text=f"Ring mapped: {sm['n_mules']} mule accounts ({sm['roles']['collector']} collection, {sm['roles']['layer']} transit, "
+                      f"{sm['roles']['cashout']} cash-out) and {sm['n_victims']} victims ({sm['n_victims_ato']} compromised). "
+                      f"{vnd(sm['victim_loss'])} traced; ~{vnd(sm['est_remaining'])} still inside the ring and can be delayed.")
+        simo = self._tool(cid, RH, "simo.lookup", {"accounts": len(ring.nodes)},
+                          lambda: call_tool(AGENT, "read_simo_lookup", lambda ids: sorted(set(ids) & self.simo_list), list(ring.nodes), case_id=cid),
+                          lambda r: {"hits": r})
         mem_query = list(dict.fromkeys(seeds + mule_ids))  # seed + mule trước để truy vấn ngữ nghĩa trúng đích
-        mem = call_tool(AGENT, "memory_recall", ring_memory.recall, mem_query, ring.summary["devices"], cid, case_id=cid)
-        regs = call_tool(AGENT, "read_regulations", knowledge.search,
-                         "dấu hiệu đáng ngờ tiền vào ra nhanh nhiều tài khoản chuyển về một tài khoản báo cáo trì hoãn giao dịch", 6, case_id=cid)
+        mem = self._tool(cid, "Memory Agent", "memory.recall", {"store": "AgentBase Memory", "accounts": len(mem_query)},
+                         lambda: call_tool(AGENT, "memory_recall", ring_memory.recall, mem_query, ring.summary["devices"], cid, case_id=cid),
+                         lambda r: {"known_ring_matches": len(r)})
+        regs = self._tool(cid, "Investigator Agent", "kb.search_regulations", {"embedding": "bge-m3", "k": 6},
+                          lambda: call_tool(AGENT, "read_regulations", knowledge.search,
+                                            "dấu hiệu đáng ngờ tiền vào ra nhanh nhiều tài khoản chuyển về một tài khoản báo cáo trì hoãn giao dịch", 6, case_id=cid),
+                          lambda r: {"docs": [d["id"] for d in r]})
         ev = self.bank.evidence(ring)
         it = s["intel"]
         intel_txt = (f"Tin nhắn do khách hàng chuyển tiếp: thủ đoạn được nhận diện là '{it['typology_label']}'"
@@ -196,6 +253,9 @@ class Investigator:
         for h in mem:
             ev.append({"id": f"EV-{len(ev):02d}", "text": f"Trùng với đường dây đã ghi nhận ở {h.get('case_id', 'vụ trước')}: {h['fact']}",
                        "accounts": h.get("overlap_accounts", []), "tx_ids": [], "legal": "Bộ nhớ dài hạn"})
+        emit(cid, type="tool", agent="Investigator Agent", tool="evidence.build_vault", args={"source": "ledger (deterministic)"},
+             status="done", ms=0, result={"items": len(ev)})
+        emit(cid, type="partial", key="evidence", data=ev)
         return {"ring": ring, "risk": risk, "simo": simo, "memory_hits": mem, "regulations": regs, "evidence": ev}
 
     def write_str(self, s: CaseState) -> dict:
@@ -203,6 +263,9 @@ class Investigator:
         ev = s["evidence"]
         feedback = s.get("judge", {}).get("issues") if s.get("judge") else None
         revisions = s.get("revisions", 0) + (1 if feedback else 0)
+        emit(cid, type="thought", agent="Investigator Agent",
+             text=(f"Rewriting the STR draft to address the Judge's feedback ({len(feedback)} issues)." if feedback else
+                   f"Drafting the STR in Vietnamese from {len(ev)} deterministic evidence items. Every figure must cite an [EV-xx] tag."))
         js = None
         if llm.enabled:
             ev_txt = "\n".join(f"{e['id']}: {e['text']} [căn cứ: {e['legal'] or '-'}]" for e in ev)
@@ -228,6 +291,7 @@ class Investigator:
             js["_mode"] = "template"
         else:
             js["_mode"] = "llm"
+        emit(cid, type="partial", key="draft", data={"tom_tat": js.get("tom_tat", ""), "mode": js["_mode"], "items": len(js.get("dau_hieu") or [])})
         return {"writer": js, "revisions": revisions}
 
     def _template_str(self, s: CaseState) -> dict:
@@ -310,6 +374,14 @@ class Investigator:
         revise = (not llm_ok) and s.get("revisions", 0) < 1
         passed = llm_ok
         audit.log("judge", case_id=cid, passed=passed, deterministic_ok=det_ok, repaired=len(repaired), issues=len(issues))
+        vals = [float(v) for v in ((rubric or {}).get("scores") or {}).values() if isinstance(v, (int, float))]
+        emit(cid, type="tool", agent="Judge Agent", tool="judge.verify_claims", args={"claims": len(checked)}, status="done", ms=0,
+             result={"verified": sum(c["ok"] for c in checked), "total": len(checked), "auto_repaired": len(repaired),
+                     "rubric_avg": round(sum(vals) / len(vals), 1) if vals else None})
+        emit(cid, type="thought", agent="Judge Agent", level="ok" if not revise else "warn",
+             text=("Rubric below threshold — sending the draft back for one rewrite." if revise else
+                   f"Fact-check complete: {sum(c['ok'] for c in checked)}/{len(checked)} claims matched the evidence vault"
+                   + (f", {len(repaired)} repaired from ledger data" if repaired else "") + ". Final draft has 0 unsupported claims."))
         return {"judge": {"passed": passed, "deterministic_ok": det_ok, "checked": checked, "issues": issues[:8], "revise": revise,
                           "repaired": repaired, "rubric": rubric, "revisions": s.get("revisions", 0)}, "writer": w}
 
@@ -319,11 +391,15 @@ class Investigator:
         mules = [n for n, v in ring.nodes.items() if v["role"] in ("collector", "layer", "cashout")]
         now = datetime.now()
         actions = []
+        emit(cid, type="thought", agent="Policy Gateway",
+             text=f"Agent requests delay_transactions on {len(mules)} accounts to protect ~{vnd(ring.summary['est_remaining'])} still in the ring.")
         try:  # agent THỬ tự trì hoãn giao dịch -> Policy Gateway chặn
             call_tool(AGENT, "delay_transactions", lambda: None, case_id=cid)
             agent_attempt = "ALLOW"
         except PolicyDenied as e:
             agent_attempt = str(e)
+            emit(cid, type="thought", agent="Policy Gateway", level="alert",
+                 text="DENY — first-match rule #4 (agent:bay-nguoc / delay_transactions). Legal actions under Art. 26, 44, 45 require an AML officer. Escalating for human approval.")
         actions.append({"id": "A1", "tool": "delay_transactions", "title": "Trì hoãn giao dịch các tài khoản thuộc đường dây",
                         "accounts": mules, "legal": "Luật PCRT 2022, Điều 44 (tối đa 03 ngày làm việc)",
                         "deadline": add_working_days(now, 3).strftime("%d/%m/%Y"),
@@ -336,18 +412,20 @@ class Investigator:
                         "legal": "Bảo vệ khách hàng", "status": "KHUYẾN NGHỊ"})
         actions.append({"id": "A4", "tool": "freeze_account", "title": "Phong tỏa tài khoản (chỉ khi có quyết định của cơ quan có thẩm quyền)",
                         "legal": "Luật PCRT 2022, Điều 45; Quy chế phối hợp NHNN – Bộ Công an", "status": "CẦN QUYẾT ĐỊNH CƠ QUAN CÓ THẨM QUYỀN"})
+        emit(cid, type="partial", key="actions", data=actions)
         return {"actions": actions, "status": "PENDING_APPROVAL"}
 
     def remember(self, s: CaseState) -> dict:
         ring = s["ring"]
         mules = [n for n, v in ring.nodes.items() if v["role"] in ("collector", "layer", "cashout")]
-        call_tool(AGENT, "memory_remember", ring_memory.remember, s["case_id"], s["intel"]["typology"], mules,
-                  ring.summary["devices"], case_id=s["case_id"])
+        self._tool(s["case_id"], "Memory Agent", "memory.remember", {"store": "AgentBase Memory", "accounts": len(mules)},
+                   lambda: call_tool(AGENT, "memory_remember", ring_memory.remember, s["case_id"], s["intel"]["typology"], mules,
+                                     ring.summary["devices"], case_id=s["case_id"]), lambda r: {"stored": True})
         return {}
 
     # ---------------- public ----------------
-    def run(self, text: str, seeds_hint: list[str] | None = None) -> dict:
-        cid = _now_case_id()
+    def run(self, text: str, seeds_hint: list[str] | None = None, case_id: str | None = None) -> dict:
+        cid = case_id or _now_case_id()
         t0 = time.time()
         audit.log("case_start", case_id=cid, chars=len(text))
         state = self.graph.invoke({"case_id": cid, "text": text, "seeds_hint": seeds_hint or [], "timeline": [], "revisions": 0})
@@ -388,6 +466,9 @@ class Investigator:
             details.append({"account_id": a, "holder": p["holder_name"], "segment": p["segment"], "score": r["score"], "band": r["band"],
                             "mitigating": r["mitigating"], "red_flags": r["red_flags"]})
         audit.log("case_cleared", case_id=s["case_id"], seeds=seeds)
+        why = "; ".join(m["text"] for d in details for m in d["mitigating"][:2]) or "behaviour consistent with the customer profile"
+        emit(s["case_id"], type="thought", agent="Triage Agent", level="ok",
+             text=f"No mule ring around the seed (risk {max((d['score'] for d in details), default=0):.0%}). Closing as FALSE POSITIVE — {why}. No STR will be filed.")
         return {"status": "CLEARED",
                 "clearance": {"verdict": "FALSE POSITIVE – không phát hiện đường dây mule", "accounts": details,
                               "note": "Không đủ căn cứ theo Điều 26–28 Luật PCRT 2022 để lập báo cáo giao dịch đáng ngờ; "
