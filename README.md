@@ -41,32 +41,16 @@ Chạy trên **GreenNode AgentBase** (Runtime, Container Registry, Memory, IAM) 
 
 ## 3. Trung tâm Tác chiến An ninh Tài chính (Ops Center)
 
-Không có nút "preset", không có stepper bắt người dắt tay AI. Người dùng (hoặc **Autopilot**) đưa một mối đe dọa vào; **Orchestrator tự quyết định**
-cử agent nào, theo kịch bản nào, và mọi bước được phát trực tiếp lên **Agentic Thought Stream**:
+- **Threat Inbox**: báo cáo khách hàng (app, Zalo, hotline, email, quầy) và cảnh báo TM đến theo thời gian; nhập tay bất kỳ văn bản nào, hoặc **Simulate unseen threat** để LLM viết một tin nhắn lừa đảo mới. **Autopilot** tự nhận việc theo mức ưu tiên.
+- **Orchestrator tự chọn playbook**: có tài khoản → điều tra; chưa lộ tài khoản → cử **Decoy Agent** (mô phỏng) rồi điều tra; tài khoản ngân hàng khác → chuyển liên ngân hàng; không có đường dây → đóng dương tính giả kèm lý do.
+- **Agentic Thought Stream**: hiển thị trực tiếp suy nghĩ từng agent, tool call, lệnh gọi GreenNode MaaS (model, độ trễ, token), quyết định Policy (ALLOW/DENY), hội thoại mồi nhử và thẻ phê duyệt Human-in-the-Loop.
+- **Case Board**: đồ thị đường dây mọc theo từng hop, Shapley XAI, kho bằng chứng EV-xx, dự thảo STR có chứng nhận Judge, sổ hành động.
+- **Analyst Copilot**: hỏi đáp tiếng Việt/Anh, chỉ trích kho bằng chứng, không có quyền hành động.
+- Tab khác: **Red Arena** (AI tấn công thử, mô hình tự tiến hóa), **Alert Triage**, **Governance** (runtime, RPM, audit trail, Policy Group).
 
-- **Threat Inbox (trực tiếp)**: báo cáo khách hàng từ nhiều kênh (app, Zalo, hotline, email, quầy) và cảnh báo TM của hệ thống giám sát theo luật đến dần theo thời gian;
-  ô *Report a new threat* nhận bất kỳ văn bản nào; **Simulate unseen threat** để LLM viết một tin nhắn lừa đảo **mới hoàn toàn** cho một đường dây ngẫu nhiên trong sổ cái
-  (chứng minh hệ thống không trả JSON dựng sẵn). Bật **Autopilot** để Orchestrator tự nhận việc theo mức ưu tiên.
-- **Orchestrator tự chọn playbook**: có tài khoản trong sổ cái → điều tra; **chưa lộ tài khoản → tự cử Decoy Agent** (persona "Bà Tư", mô phỏng LLM-đối-LLM) đến khi kẻ gian đọc
-  ra tài khoản rồi tự quay lại điều tra; tài khoản ngân hàng khác → chuyển SIMO/liên ngân hàng; không có đường dây → đóng dương tính giả kèm lý do.
-- **Agentic Thought Stream**: suy nghĩ của từng agent, **tool call** (tham số, kết quả, ms), **lệnh gọi GreenNode MaaS** (model, độ trễ, token), quyết định **Policy Gateway**
-  (ALLOW/DENY), hội thoại mồi nhử từng lượt, và **thẻ phê duyệt Human-in-the-Loop** ngay trong luồng (Approve / Reject, phong tỏa cần số quyết định cơ quan có thẩm quyền).
-  Kỹ thuật: event bus (`app/events.py`) + run store, giao diện polling `GET /api/ops/events/{case}?after=N`.
-- **Case Board**: KPI, đồ thị đường dây **mọc dần theo từng hop**, Shapley XAI từng tài khoản, kho bằng chứng EV-xx, dự thảo STR có chứng nhận Judge, sổ hành động.
-- **Analyst Copilot**: hỏi đáp về vụ việc bằng tiếng Việt/Anh, **chỉ được trích kho bằng chứng** (mã EV không tồn tại bị gỡ), qua guardrail chống prompt injection, không có quyền hành động.
+**Trải nghiệm nhanh (link demo, tab ẩn danh):** bấm thẻ *Hotline 1900 call transcript* trong Inbox (xuất hiện sau ~20 giây) → xem Orchestrator tự cử mồi nhử, săn đường dây, soạn STR → **Approve** một hành động → hỏi Copilot → bấm *Simulate unseen threat* rồi xử lý tin nhắn mới.
 
-Thiết kế theo bộ skill *UI/UX Pro Max*: giao diện ngân hàng sáng (đỏ burgundy + be nhạt), IBM Plex Sans/Mono, icon SVG Lucide, focus rõ, tôn trọng reduced-motion,
-responsive 375–1760px; đồ thị phân loại bằng **màu + hình dạng**. Các tab khác: **Red Arena**, **Alert Triage**, **Governance** (runtime, RPM, audit trail, Policy Group, kiến trúc).
-
-## 4. Tuân thủ quy định kỹ thuật của BTC
-
-- **Image agent deploy trên GreenNode AgentBase** (Custom Agent runtime, image trên AgentBase Container Registry).
-- **Chỉ dùng model GreenNode MaaS**; không dùng model bên ngoài.
-- **Rate limit theo user**: GLM 5.2 = 15, GLM 5.3 Flash = 10, Qwen 3.8 Flash = 10, Gemma 4 = 15 RPM. `app/llm.py` giới hạn cửa sổ trượt 60s từng model (chừa 1 request an toàn), hết hạn mức thì chuyển model, tất cả hết thì chờ có giới hạn rồi rơi về template tất định; có test `tests/test_rate_limit.py`. Theo dõi trực tiếp ở tab Governance (`/api/llm_status`).
-- **Bí mật**: key MaaS của runtime là key **riêng** tạo bằng IAM (`deploy/agentbase.py llm-key`); `.env`, `.env.runtime`, `.greennode.json` không nằm trong repo hay image.
-- Theo dõi chi phí MaaS: https://docs.greennode.ai/ai-stack/usage-budget
-
-## 5. Kết quả đánh giá (dữ liệu tổng hợp)
+## 4. Kết quả đánh giá (dữ liệu tổng hợp)
 
 Giao thức: huấn luyện trên 3 thế giới tổng hợp (3 thủ đoạn); đánh giá trên **thế giới chưa từng thấy** (seed khác, thêm thủ đoạn "chiếm quyền điện thoại"
 không có khi huấn luyện) và **Red Arena** 3 mức độ × 5 seed độc lập. Xem `data/eval.json` (sinh khi build).
@@ -76,57 +60,90 @@ không có khi huấn luyện) và **Red Arena** 3 mức độ × 5 seed độc 
 | Khoanh vùng đường dây từ 1 tài khoản (6 đường dây, gồm thủ đoạn chưa thấy) | 44/44 mule, 84/84 nạn nhân, 0 tài khoản thừa |
 | Alert Triage: 278 cảnh báo, 234 là giả | Tự đóng đúng 217, leo thang 44/44 mule, 17 chuyển bảo vệ nạn nhân, **0 mule bị bỏ sót**, −78% khối lượng |
 | Red Arena mức "Khó" (giữ tiền 4–33 giờ, không chia nhỏ, không dùng chung thiết bị) | v1: **0%** → v2 (tự tiến hóa): **100%**, không tăng cảnh báo nhầm |
-| Tin nhắn → hồ sơ STR có Judge (LLM thật trên MaaS) | ~20–25 giây; cảnh báo giả đóng trong ~5 giây |
+| Tin nhắn → hồ sơ STR có Judge (LLM thật trên MaaS) | ~30–40 giây (kể cả mồi nhử); cảnh báo giả đóng trong ~5 giây |
 
 **Giới hạn trung thực:** số liệu đo trên dữ liệu **tổng hợp** do chính bộ mô phỏng sinh ra nên lạc quan hơn thực tế.
 Triển khai thật bắt đầu bằng **shadow mode** trên dữ liệu ngân hàng (chạy song song, không can thiệp) để đo lại.
 
-## 6. An toàn, bảo mật & tuân thủ
+## 5. An toàn, bảo mật & tuân thủ
 
 - **Human-in-the-loop ép buộc ở tầng gateway** (`app/policy.py`, first-match-wins): agent chỉ ALLOW `read_*`, `draft_*`, `memory_*`; DENY `delay_transactions` (Điều 44), `submit_str` (Điều 26), `freeze_account` (Điều 45 – chỉ khi có quyết định cơ quan có thẩm quyền).
 - **Chống prompt injection**: tin nhắn kẻ gian là dữ liệu thù địch; LLM **không có quyền** đổi điểm rủi ro.
 - **Chống bịa**: số tài khoản trích bằng regex; mọi con số trong STR phải khớp kho bằng chứng EV-xx (Judge tất định + rubric LLM), câu sai được thay bằng câu sinh từ dữ liệu.
 - **Bảo vệ dữ liệu cá nhân**: che SĐT/CCCD/email trước khi gửi LLM, che tên chủ tài khoản trong STR; model chạy trên GreenNode MaaS tại Việt Nam.
+- **Chỉ dùng GreenNode MaaS**, giới hạn RPM theo quy định BTC (`app/llm.py`); runtime dùng key MaaS **riêng** tạo bằng IAM, không có secret trong repo hay image.
 - **Kiểm toán**: mọi lệnh gọi LLM / tool / quyết định policy / phê duyệt ghi vết (`/api/audit`).
 - **Căn cứ pháp lý**: Luật Phòng, chống rửa tiền 2022 (14/2022/QH15) Điều 26, 27, 28, 37, 44, 45; QĐ 2345/QĐ-NHNN; Luật Bảo vệ dữ liệu cá nhân 2025; Quy chế phối hợp NHNN – Bộ Công an (23/6/2026).
 - **Persona mồi nhử** chỉ chạy **mô phỏng** (LLM đối LLM). Ngoài đời mặc định là thụ động (khách chuyển tiếp tin nhắn); chủ động chỉ khi phối hợp cơ quan công an.
 
-## 7. Kiến trúc trên GreenNode
+## 6. Kiến trúc trên GreenNode
 
 ```
 Ops Center (UI) ──► AgentBase Runtime (Custom Agent, container :8080)
-                      ├─ GET /health · POST /invocations (AgentBase SDK) · GET / + /static + /api/* + /api/ops/*
-                      ├─ Orchestrator (playbook) ─┬─► Decoy Agent (khi chưa lộ tài khoản) ─┐
-                      │                           └──────────────────────────────────────────┴─► LangGraph:
-                      │      Guardrail → Intel → Ring Hunter ─┬─► Investigator → Judge → Policy → Memory
-                      │                                       └─► False-positive closure (no STR)
-                      ├─ Event bus → Agentic Thought Stream · Analyst Copilot (grounded on EV-xx)
-                           ├─► GreenNode MaaS qua LLM Gateway (định tuyến theo tác vụ + RPM guard), bge-m3 (RAG)
-                           └─► AgentBase Memory (ring fingerprints)
+                      ├─ GET /health · POST /invocations (AgentBase SDK) · GET / · /api/* · /api/ops/*
+                      ├─ Orchestrator ──► [Decoy Agent khi chưa lộ tài khoản] ──► LangGraph:
+                      │     Guardrail → Intel → Ring Hunter ─┬─► Investigator → Judge → Policy → Memory
+                      │                                      └─► False-positive closure (không sinh STR)
+                      ├─ Event bus → Agentic Thought Stream · Analyst Copilot (chỉ trích EV-xx)
+                      ├─► GreenNode MaaS qua LLM Gateway (định tuyến theo tác vụ + RPM guard), bge-m3 (RAG)
+                      └─► AgentBase Memory (dấu vân tay đường dây)
 Image: build → push AgentBase Container Registry (vcr.vngcloud.vn) → runtime PUBLIC
 ```
 
-## 8. Chạy thử
+## 7. Cài đặt & chạy từ mã nguồn
+
+**Yêu cầu:** Python 3.12, Git; Docker (chỉ khi build image / deploy). Không có key MaaS vẫn chạy được ở **chế độ offline** (LLM thay bằng template tất định).
+
+### 7.1. Chạy local
 
 ```bash
-python -m venv .venv && .venv/Scripts/pip install -r requirements.txt   # Linux/macOS: .venv/bin/pip
-python -m scripts.build_assets        # sinh dữ liệu tổng hợp, huấn luyện, đánh giá -> data/
-cp .env.example .env                  # điền LLM_API_KEY (GreenNode MaaS); để trống = chế độ offline
-python main.py                        # http://localhost:8080
-python -m pytest -q                   # 19 bài kiểm thử (end-to-end, orchestrator tự chủ, copilot, false-positive, honeypot, Shapley, rate limit)
+git clone https://github.com/Haoalpha/counter-snare.git && cd counter-snare
+python -m venv .venv
+.venv/Scripts/activate                 # Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+python -m scripts.build_assets         # sinh dữ liệu tổng hợp + huấn luyện + đánh giá -> data/ (~1–2 phút)
+cp .env.example .env                   # điền LLM_API_KEY (GreenNode MaaS); để trống = offline
+python main.py                         # mở http://localhost:8080
 ```
 
-Gọi agent theo chuẩn AgentBase:
+Kiểm thử (19 bài: end-to-end, orchestrator tự chủ, copilot, mồi nhử, dương tính giả, Shapley, rate limit):
 
 ```bash
-curl -X POST "$ENDPOINT/invocations" -H "Content-Type: application/json" \
-  -H "X-GreenNode-AgentBase-Session-Id: s1" -H "X-GreenNode-AgentBase-User-Id: u1" \
-  -d '{"message": "Chuyển ngay 50 triệu vào tài khoản 1903xxxxxxxx ngân hàng NHX ..."}'
+python -m pytest -q
 ```
 
-Deploy: xem `deploy/DEPLOY.md` (`deploy/agentbase.py deploy` = build → push vCR → tạo/cập nhật runtime → chờ ACTIVE).
+### 7.2. Chạy bằng Docker
 
-## 9. Khai báo xuất xứ (bắt buộc theo thể lệ)
+```bash
+docker build -t counter-snare .        # image tự sinh dữ liệu và chạy test khi build
+docker run -p 8080:8080 --env-file .env counter-snare
+```
+
+### 7.3. Deploy lên GreenNode AgentBase
+
+Xem `deploy/DEPLOY.md`. Tóm tắt: `deploy/agentbase.py login` → `llm-key` (key MaaS riêng cho runtime) → `memory` → `deploy` (build → push vCR → tạo/cập nhật runtime → chờ ACTIVE).
+Dùng `--max-replicas 1` vì luồng sự kiện của Ops Center lưu trong bộ nhớ tiến trình.
+
+### 7.4. Gọi agent theo chuẩn AgentBase
+
+```bash
+curl -X POST "$ENDPOINT/invocations" -H "Content-Type: application/json"   -H "X-GreenNode-AgentBase-Session-Id: s1" -H "X-GreenNode-AgentBase-User-Id: u1"   -d '{"message": "Chuyển ngay 50 triệu vào tài khoản 1903xxxxxxxx ngân hàng NHX ..."}'
+```
+
+### 7.5. Cấu trúc mã nguồn
+
+| Đường dẫn | Vai trò |
+|---|---|
+| `main.py` | Entry point AgentBase (`/invocations`, `/health`), UI và API |
+| `app/orchestrator.py` | Orchestrator tự chọn playbook, lưu luồng sự kiện |
+| `app/agents.py` | Đồ thị LangGraph: Guardrail → Intel → Ring Hunter → Investigator → Judge → Policy → Memory |
+| `app/honeypot.py` · `app/copilot.py` · `app/threatsim.py` | Decoy Agent · Analyst Copilot · sinh mối đe dọa mới |
+| `app/llm.py` · `app/policy.py` · `app/guard.py` | LLM Gateway + RPM · Policy Gateway · guardrail |
+| `app/simulator.py` · `app/model.py` · `app/arena.py` · `app/triage.py` | Dữ liệu tổng hợp · mô hình rủi ro + Shapley · Red Arena · Alert Triage |
+| `scripts/build_assets.py` | Sinh dữ liệu, huấn luyện, đánh giá → `data/` |
+| `static/` · `tests/` · `deploy/` | Giao diện · kiểm thử · công cụ deploy AgentBase |
+
+## 8. Khai báo xuất xứ (bắt buộc theo thể lệ)
 
 - **Dữ liệu**: 100% **tổng hợp** do `app/simulator.py` sinh ra (tên, số tài khoản, giao dịch đều giả); ngân hàng dùng mã giả định (NHX, NHB…). Không dùng dữ liệu khách hàng/giao dịch thật.
   Kỹ thuật mô phỏng planning–execution tham khảo bài báo Borrajo, Veloso, Shah – *Simulating and classifying behavior in adversarial environments based on action-state traces* (ICAIF 2020).
